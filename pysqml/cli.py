@@ -156,9 +156,6 @@ def main(args=None):
         logger.warning('No data consumers defined. Exit')
         sys.exit(1)
 
-    # Only 1 SQM is supported for the moment
-    sqm = sqmlist[0]
-
     logger.info('pysqml-lite, starting')
 
     exit_event = threading.Event()
@@ -189,15 +186,22 @@ def main(args=None):
         cons.start()
         all_consumers.append(cons)
 
-    timer = threading.Thread(
-        target=read_photometer_timed,
-        name='sqm_reader',
-        args=(sqm, q_prod, exit_event)
-    )
-    timer.start()
+    all_readers = []
+
+    for idx, sqm in enumerate(sqmlist):
+        reader = threading.Thread(
+            target=read_photometer_timed,
+            name='sqm_reader_{}'.format(sqm.name),
+            args=(sqm, q_prod, exit_event)
+        )
+        reader.start()
+        all_readers.append(reader)
 
     consd.join()
-    timer.join()
+
+    for t in all_readers:
+        t.join()
+
     for t in all_consumers:
         t.join()
 
