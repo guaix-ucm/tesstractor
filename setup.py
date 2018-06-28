@@ -3,14 +3,14 @@
 from distutils.core import setup
 
 setup(name='pysqml',
-      version='3.1',
-      author='Miguel Nievas',
-      author_email='miguelnievas@ucm.es',
+      version='0.1',
+      author='Sergio Pascual',
+      author_email='sergiopr@fis.ucm.es',
       url='http://guaix.fis.ucm.es/hg/pysqml/',
       license='GPLv3',
-      description='SQM reading and plotting software',
+      description='Minimal SQM reading software',
       packages=['pysqml'],
-      install_requires=['pyephem','numpy','matplotlib', 'pyserial', 'paho-mqtt'],
+      install_requires=['pyserial', 'paho-mqtt'],
       classifiers=[
           "Programming Language :: C",
           "Programming Language :: Cython",

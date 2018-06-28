@@ -1,22 +1,20 @@
 
 import threading
-import time
 import datetime
 import queue
 import signal
 import logging
-import json
 
 import serial
 
 from pysqml.sqm import SQMTest, SQMLU
+import pysqml.mqtt as mqtt
 
-import paho.mqtt.client as mqtt
 
-
+# FIXME: This is applied in two places
 _HALF_S = datetime.timedelta(seconds=0.5)
 
-_logger = logging.getLogger('pysqml')
+_logger = logging.getLogger(__name__)
 
 
 def signal_handler_function(signum, frame, exit_event):
@@ -35,11 +33,11 @@ def read_photometer(sqm, seq):
 
 def read_photometer_timed(sqm, q, exit_event):
     thisth = threading.current_thread()
-    logger = logging.getLogger('pysqml')
-    logger.info('starting {} thread'.format(thisth.name))
+    _logger.info('starting {} thread'.format(thisth.name))
     seq = 0
-    # FIXME: any exception here should terminate all the threads
 
+    timeout = 60
+    # FIXME: any exception here should terminate all the threads
     # initialice connection. read metadata and calibration
     sqm.read_metadata()
     # Read calibration
@@ -64,125 +62,37 @@ def read_photometer_timed(sqm, q, exit_event):
         payload['name'] = sqm.name
         q.put(payload)
         seq += 1
-        do_exit = exit_event.wait(timeout=5)
+        do_exit = exit_event.wait(timeout=60)
 
-    logger.info('end producer thread')
-    logger.info('signalling consumers to end')
+    _logger.info('end producer thread')
+    _logger.info('signalling consumers to end')
     q.put(None)
 
 
 def conductor(q, qs):
     thisth = threading.current_thread()
-    logger = logging.getLogger('pysqml')
-    logger.info('starting {} thread'.format(thisth.name))
+    _logger.info('starting {} thread'.format(thisth.name))
     while True:
         payload = q.get()
         q.task_done()
         for wq in qs:
             wq.put(payload)
         if payload is None:
-            logger.info('end conductor thread')
+            _logger.info('end conductor thread')
             break
 
 
-def consumer0(q, other):
-    logger = logging.getLogger('pysqml')
-    logger.info('s consumer0')
+def simple_consumer(q, other):
+    _logger.info('starting simple_consumer thread')
     while True:
         payload = q.get()
         if payload:
-            logger.debug('payload0 %s', payload)
+            print(payload)
             q.task_done()
         else:
-            logger.info('end consumer0 thread')
+            _logger.info('end simple_consumer thread')
             break
 
-
-def consumer1(q, other):
-    logger = logging.getLogger('pysqml')
-    logger.info('s consumer1')
-    while True:
-        payload = q.get()
-        if payload:
-            logger.debug('payload1 %s', payload)
-            q.task_done()
-        else:
-            logger.info('end consumer1 thread')
-            break
-
-
-def consumer_mqtt(q, other):
-    logger = logging.getLogger('pysqml')
-    _logger.info('starting MQTT consumer')
-
-    other.connect()
-    other.client.loop_start()
-
-    while True:
-        payload = q.get()
-        if payload:
-            logger.debug('got payload %s', payload)
-            res = other.do_work1(payload)
-            logger.debug('server says %s', res)
-            q.task_done()
-        else:
-            logger.info('end MQTT consumer thread')
-            other.client.loop_stop()
-            break
-
-
-class MqttConsumer:
-    def __init__(self, config):
-        self.client = mqtt.Client()
-        self.config = config
-
-        # logger.info('open MQTT connection with {}'.format(SQM_CONFIG['hostname']))
-
-        self.publish_topic = 'STARS4ALL/{}/reading'.format(self.config['channel'])
-
-    # client.loop_start()
-
-    def connect(self):
-        self.client.username_pw_set(
-            self.config['username'],
-            password=self.config['password']
-        )
-        _logger.info('open MQTT connection with {}'.format(self.config['hostname']))
-        self.client.connect(
-            self.config['hostname'],
-            1883,
-            60
-        )
-
-    def do_work1(self, msg):
-        if msg['cmd'] == 'id':
-            del msg['cmd']
-            msg['chan'] = self.config['channel']
-
-            spayload = json.dumps(msg)
-            _logger.debug('sending register msg %s', spayload)
-            response = self.client.publish(self.config['register_topic'], spayload)
-            return response
-        elif msg['cmd'] == 'r':
-            del msg['cmd']
-
-            payload = dict(seq=0, freq=0.0, mag=0.0, tamb=0.0, tsky=0.0, rev=1)
-
-            now = datetime.datetime.utcnow()
-            payload['seq'] = msg['seq']
-            # 'freq_sensor': 15370, 'period_sensor': 0.0,
-            payload['freq'] = msg['period_sensor']
-            payload['mag'] = msg['sky_brightness']
-            payload['tamb'] = msg['temp_sensor']
-            # payload['tstamp'] = now.isoformat()
-            # round to nearest second
-            payload['tstamp'] = (now + _HALF_S).strftime("%Y-%m-%dT%H:%M:%S")
-            spayload = json.dumps(payload)
-            response = self.client.publish(self.publish_topic, spayload, qos=0)
-            _logger.debug('sending data %s', spayload)
-            return response
-        else:
-            raise ValueError
 
 def build_dev_from_ini(section):
     tipo = section.get('type', 'test')
@@ -198,26 +108,19 @@ def build_dev_from_ini(section):
 
 
 def build_consumers_from_init(conf):
-    # valid values: mqtt,
+    # valid values: mqtt, simple
     consumers = []
     mqtt_sections = [sec for sec in conf.sections() if sec.startswith('mqtt')]
     for sec in mqtt_sections:
         mqtt_config = conf[sec]
-        other_mqtt = MqttConsumer(mqtt_config)
-        consumers.append((consumer_mqtt, other_mqtt))
+        other_mqtt = mqtt.MqttConsumer(mqtt_config)
+        consumers.append((mqtt.consumer_mqtt, other_mqtt))
+
+    simple_sections = [sec for sec in conf.sections() if sec.startswith('simple')]
+    for _ in simple_sections:
+        consumers.append((simple_consumer, None))
+
     return consumers
-
-
-def build_comsumer_from_ini(section):
-    tipo = section.get('type', 'test')
-    if tipo == 'test':
-        return SQMTest()
-    else:
-        name = section.get('name')
-        print('name is ', name)
-        conn = serial.Serial('/dev/ttyUSB0', 115200, timeout=2)
-        sqm = SQMLU(conn, name)
-        return sqm
 
 
 def main(args=None):
