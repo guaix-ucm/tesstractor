@@ -127,7 +127,7 @@ def signal_handler(signal, frame, exit_event):
 
 def main():
     logging.basicConfig(level=logging.DEBUG)
-    logger = logging.getLogger('pysqm')
+    logger = logging.getLogger('pysqml')
     logger.info('something, starting')
 
     exit_event = threading.Event()
@@ -170,7 +170,7 @@ def producer1(qus, exit_event, sqmdev):
     from configS import SQM_CONFIG
     idx = 0
     thisth = threading.current_thread()
-    logger = logging.getLogger('pysqm')
+    logger = logging.getLogger('pysqml')
     logger.info('starting {}'.format(thisth.name))
     do_exit = False
 
@@ -209,7 +209,7 @@ def producer1(qus, exit_event, sqmdev):
 def consumer1(qu):
     from configS import SQM_CONFIG
     thisth = threading.current_thread()
-    logger = logging.getLogger('pysqm')
+    logger = logging.getLogger('pysqml')
     logger.info('starting {}'.format(thisth.name))
 
     client = mqtt.Client()
@@ -263,7 +263,7 @@ def do_work1(client, msg):
 
 
 def consumer2(qu):
-    logger = logging.getLogger('pysqm')
+    logger = logging.getLogger('pysqml')
     thisth = threading.current_thread()
     logger.info('starting {}'.format(thisth.name))
     with open('file.txt', 'a') as fd:
@@ -284,7 +284,7 @@ def do_work2(fd, item):
 def main_no_th():
 
     logging.basicConfig(level=logging.DEBUG)
-    logger = logging.getLogger('pysqm')
+    logger = logging.getLogger('pysqml')
     logger.info('something, starting')
 
     sqmtest1 = SQMTest()
@@ -300,7 +300,7 @@ def main_no_th():
 def reader(sqmdev):
 
     idx = 0
-    logger = logging.getLogger('pysqm')
+    logger = logging.getLogger('pysqml')
     do_exit = False
 
     sqmdev.init_metadata()
@@ -330,7 +330,7 @@ def producer1(qus, exit_event, sqmdev):
     from configS import SQM_CONFIG
     idx = 0
     thisth = threading.current_thread()
-    logger = logging.getLogger('pysqm')
+    logger = logging.getLogger('pysqml')
     logger.info('starting {}'.format(thisth.name))
     do_exit = False
 
@@ -369,7 +369,7 @@ def producer1(qus, exit_event, sqmdev):
 def consumer1(qu):
     from configS import SQM_CONFIG
     thisth = threading.current_thread()
-    logger = logging.getLogger('pysqm')
+    logger = logging.getLogger('pysqml')
     logger.info('starting {}'.format(thisth.name))
 
     client = mqtt.Client()
@@ -419,11 +419,12 @@ def do_work1(client, msg):
             payload['tstamp'] = (now + HALF_S).strftime("%Y-%m-%dT%H:%M:%S")
             spayload = json.dumps(payload)
             response = client.publish(publish_topic, spayload, qos=0)
+            print('data, payload', spayload)
             print('publish, response', response)
 
 
 def consumer2(qu):
-    logger = logging.getLogger('pysqm')
+    logger = logging.getLogger('pysqml')
     thisth = threading.current_thread()
     logger.info('starting {}'.format(thisth.name))
     with open('file.txt', 'a') as fd:
@@ -440,8 +441,6 @@ def consumer2(qu):
 def do_work2(fd, item):
     fd.write('{}\n'.format(item))
 
-
-from __future__ import print_function
 
 import logging
 import time
