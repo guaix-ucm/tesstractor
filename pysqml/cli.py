@@ -62,7 +62,7 @@ def read_photometer_timed(sqm, q, exit_event):
         payload['name'] = sqm.name
         q.put(payload)
         seq += 1
-        do_exit = exit_event.wait(timeout=60)
+        do_exit = exit_event.wait(timeout=timeout)
 
     _logger.info('end producer thread')
     _logger.info('signalling consumers to end')
