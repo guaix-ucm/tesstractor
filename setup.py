@@ -1,5 +1,5 @@
 
-from distutils.core import setup
+from setuptools import setup
 
 setup(
     name='pysqml',
@@ -11,6 +11,12 @@ setup(
     description='Minimal SQM reading software',
     packages=['pysqml'],
     install_requires=['pyserial', 'paho-mqtt'],
+    entry_points={
+        'console_scripts': [
+            'pysqm_lite = pysqml.cli:main'
+        ]
+    },
+    zip_safe=False,
     classifiers=[
         "Programming Language :: C",
         "Programming Language :: Cython",
