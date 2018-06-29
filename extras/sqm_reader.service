@@ -1,4 +1,8 @@
+[Unit]
+Description=PySQM-lite reader
+
 [Service]
-Type=oneshot
-ExecStart=/usr/bin/echo 'serial SQM reader'
-StopWhenUnneeded=true
+ExecStart=%h/.local/bin/pysqm_lite -c %h/config.ini
+
+[Install]
+WantedBy=default.target
