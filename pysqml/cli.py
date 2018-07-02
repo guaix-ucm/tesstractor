@@ -15,7 +15,7 @@ import logging
 
 import serial
 
-from pysqml.sqm import SQMTest, SQMLU
+from pysqml.sqm import SQMTest, SQMLU, filter_buffer
 import pysqml.mqtt as mqtt
 
 
@@ -29,22 +29,14 @@ def signal_handler_function(signum, frame, exit_event):
     exit_event.set()
 
 
-def read_photometer(sqm, seq):
-    now = datetime.datetime.utcnow()
-    msg = sqm.read_data()
-
-    payload = dict(msg)
-    payload['seq'] = seq
-    payload['tstamp'] = (now + _HALF_S).strftime("%Y-%m-%dT%H:%M:%S")
-    return payload
-
-
 def read_photometer_timed(sqm, q, exit_event):
     thisth = threading.current_thread()
     _logger.info('starting {} thread'.format(thisth.name))
     seq = 0
 
-    timeout = 60
+    buffer = []
+    nsamples = 6
+    timeout = 10
 
     # initialice connection. read metadata and calibration
 
@@ -52,7 +44,6 @@ def read_photometer_timed(sqm, q, exit_event):
         sqm.read_metadata()
         # Read calibration
         sqm.read_calibration()
-
 
         mac = sqm.serial_number
         payload_init = dict(
@@ -69,10 +60,21 @@ def read_photometer_timed(sqm, q, exit_event):
         do_exit = exit_event.wait(timeout=2)
 
         while not do_exit:
-            payload = read_photometer(sqm, seq)
+            now = datetime.datetime.utcnow()
+            msg = sqm.read_data()
+            payload = dict(msg)
+            payload['tstamp'] = (now + _HALF_S).strftime("%Y-%m-%dT%H:%M:%S")
             payload['name'] = sqm.name
-            q.put(payload)
-            seq += 1
+
+            buffer.append(payload)
+            if len(buffer) >= nsamples:
+                # do average
+                avg = filter_buffer(buffer)
+                avg['seq'] = seq
+                # reset buffer
+                buffer = []
+                q.put(avg)
+                seq += 1
             do_exit = exit_event.wait(timeout=timeout)
 
     finally:

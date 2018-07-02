@@ -11,6 +11,8 @@
 import logging
 import time
 import re
+import math
+
 
 MEASURE_RE = re.compile(br"""
                 \s* # Skip whitespace
@@ -278,3 +280,22 @@ class SQMTest(SQM):
         msg = self.rx
         match = MEASURE_RE.match(msg)
         return self.process_data(match)
+
+
+def filter_buffer(payloads):
+    mags = [p['sky_brightness'] for p in payloads]
+    avg_mag = average_mags(mags)
+    # return avg payload
+    avg_payload = dict(payloads[0])
+    avg_payload['sky_brightness'] = avg_mag
+    return avg_payload
+
+
+def average_mags(mags):
+    # to avoid overflows reference to the brightest mag
+    min_mag = min(mags)
+    fluxes = [10**(-0.4 * (m - min_mag)) for m in mags]
+    avg_flux = sum(fluxes) / len(fluxes)
+    avg_mag = min_mag - 2.5 * math.log10(avg_flux)
+    # return avg payload
+    return avg_mag
