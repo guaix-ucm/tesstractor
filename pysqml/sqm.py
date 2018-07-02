@@ -17,7 +17,7 @@ import math
 MEASURE_RE = re.compile(br"""
                 \s* # Skip whitespace
                 (?P<cmd>r),
-                (?P<sky_brightness>\s\d{2}\.\d{2})m,
+                (?P<sky_brightness>[\-\s]\d{2}\.\d{2})m,
                 (?P<freq_sensor>\d{10})Hz,
                 (?P<ticks_uC>\d{10})c,
                 (?P<period_sensor>\d{7}\.\d{3})s,
