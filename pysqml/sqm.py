@@ -16,42 +16,32 @@ import math
 
 MEASURE_RE = re.compile(br"""
                 \s* # Skip whitespace
-                (?P<cmd>r) # Command
-                ,\s*
-                (?P<sky_brightness>\d*.\d*)m
-                ,\s*
-                (?P<freq_sensor>\d*)Hz
-                ,\s*
-                (?P<ticks_uC>\d*)c
-                ,\s*
-                (?P<period_sensor>\d*.\d*)s
-                ,\s*
-                (?P<temp_sensor>\d*.\d*)C
+                (?P<cmd>r),
+                (?P<sky_brightness>\s\d{2}\.\d{2})m,
+                (?P<freq_sensor>\d{10})Hz,
+                (?P<ticks_uC>\d{10})c,
+                (?P<period_sensor>\d{7}\.\d{3})s,
+                (?P<temp_sensor>[\-\s]\d{3}\.\d)C
                 """, re.VERBOSE)
 
 CALIB_RE = re.compile(br"""
-                \s* # Skip whitespace
-                (?P<cmd>c) # Command
-                ,\s*
-                (?P<light_cal>\d*.\d*)m
-                ,\s*
-                (?P<dark_period>\d*.\d*)s
-                ,\s*
-                (?P<light_cal_temp>\d*.\d*)C
-                ,\s*
-                (?P<off_ref>\d*.\d*)m
-                ,\s*
-                (?P<dark_cal_temp>\d*.\d*)C
+                (?P<cmd>c),
+                (?P<light_cal>\d{8}\.\d{2})m,
+                (?P<dark_period>\d{7}\.\d{3})s,
+                (?P<light_cal_temp>[\-\s]\d{3}\.\d)C,
+                (?P<off_ref>\d{8}\.\d{2})m,
+                (?P<dark_cal_temp>[\-\s]\d{3}\.\d)C
                 """, re.VERBOSE)
 
 META_RE = re.compile(br"""
-                \s* # Skip whitespace
-                (?P<cmd>i) # Command
-                ,\s*
-                (?P<protocol_number>\d*)
-                ,\s*(?P<model_number>\d*),\s*
-                (?P<feature_number>\d*),\s*(?P<serial_number>\d*)
+                (?P<cmd>i),
+                (?P<protocol_number>\d{8}),
+                (?P<model_number>\d{8}),
+                (?P<feature_number>\d{8}),
+                (?P<serial_number>\d{8})
                 """, re.VERBOSE)
+
+_logger = logging.getLogger(__name__)
 
 
 class SQM(object):
@@ -108,6 +98,7 @@ class SQM(object):
 
     def reset_device(self):
         """Restart connection"""
+        _logger.debug('reset device')
         self.close_connection()
         self.start_connection()
 
@@ -154,6 +145,7 @@ class SQM(object):
         this_try = 0
         while this_try < tries:
             msg = self.read_msg()
+            logger.debug("msg is %s", msg)
             match = CALIB_RE.match(msg)
             if match:
                 logger.debug('process calibration')
@@ -183,6 +175,7 @@ class SQM(object):
         this_try = 0
         while this_try < tries:
             msg = self.read_msg()
+            logger.debug("msg is %s", msg)
             match = MEASURE_RE.match(msg)
             if match:
                 logger.debug('process data')
@@ -191,6 +184,8 @@ class SQM(object):
                 return pmsg
             else:
                 logger.warning('malformed data, try again')
+                print(msg)
+                logger.debug('data is %s', msg)
                 this_try += 1
                 time.sleep(self.cmd_wait)
                 self.reset_device()
@@ -219,6 +214,7 @@ class SQMLU(SQM):
 
     def start_connection(self):
         """Start photometer connection"""
+        _logger.debug('start connection')
         time.sleep(self.cmd_wait)
         self.ix_readout = self.read_metadata(tries=10)
         time.sleep(self.cmd_wait)
@@ -229,6 +225,7 @@ class SQMLU(SQM):
     def close_connection(self):
         """End photometer connection"""
         # Check until there is no answer from device
+        _logger.debug('close connection')
         answer = True
         while answer:
             answer = self.read_msg()
