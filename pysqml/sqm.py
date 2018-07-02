@@ -1,3 +1,13 @@
+#
+# Copyright 2018 Universidad Complutense de Madrid
+#
+# This file is part of pysqm-lite
+#
+# SPDX-License-Identifier: GPL-3.0+
+# License-Filename: LICENSE.txt
+#
+
+
 import logging
 import time
 import re
@@ -15,8 +25,7 @@ MEASURE_RE = re.compile(br"""
                 (?P<period_sensor>\d*.\d*)s
                 ,\s*
                 (?P<temp_sensor>\d*.\d*)C
-                """
-                        , re.VERBOSE)
+                """, re.VERBOSE)
 
 CALIB_RE = re.compile(br"""
                 \s* # Skip whitespace
@@ -31,8 +40,7 @@ CALIB_RE = re.compile(br"""
                 (?P<off_ref>\d*.\d*)m
                 ,\s*
                 (?P<dark_cal_temp>\d*.\d*)C
-                """
-                      , re.VERBOSE)
+                """, re.VERBOSE)
 
 META_RE = re.compile(br"""
                 \s* # Skip whitespace
@@ -41,8 +49,7 @@ META_RE = re.compile(br"""
                 (?P<protocol_number>\d*)
                 ,\s*(?P<model_number>\d*),\s*
                 (?P<feature_number>\d*),\s*(?P<serial_number>\d*)
-                """
-                     , re.VERBOSE)
+                """, re.VERBOSE)
 
 
 class SQM(object):
