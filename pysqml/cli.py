@@ -45,36 +45,42 @@ def read_photometer_timed(sqm, q, exit_event):
     seq = 0
 
     timeout = 60
-    # FIXME: any exception here should terminate all the threads
+
     # initialice connection. read metadata and calibration
-    sqm.read_metadata()
-    # Read calibration
-    sqm.read_calibration()
 
-    mac = sqm.serial_number
-    payload_init = dict(
-        name=sqm.name,
-        mac=mac,
-        calib=sqm.calibration,
-        rev=1,
-        chan="unknown",
-        cmd='id'
-    )
+    try:
+        sqm.read_metadata()
+        # Read calibration
+        sqm.read_calibration()
 
-    q.put(payload_init)
 
-    do_exit = exit_event.wait(timeout=2)
+        mac = sqm.serial_number
+        payload_init = dict(
+            name=sqm.name,
+            mac=mac,
+            calib=sqm.calibration,
+            rev=1,
+            chan="unknown",
+            cmd='id'
+        )
 
-    while not do_exit:
-        payload = read_photometer(sqm, seq)
-        payload['name'] = sqm.name
-        q.put(payload)
-        seq += 1
-        do_exit = exit_event.wait(timeout=timeout)
+        q.put(payload_init)
 
-    _logger.info('end producer thread')
-    _logger.info('signalling consumers to end')
-    q.put(None)
+        do_exit = exit_event.wait(timeout=2)
+
+        while not do_exit:
+            payload = read_photometer(sqm, seq)
+            payload['name'] = sqm.name
+            q.put(payload)
+            seq += 1
+            do_exit = exit_event.wait(timeout=timeout)
+
+    finally:
+        _logger.info('end producer thread')
+        _logger.info('signalling producers to end')
+        exit_event.set()
+        _logger.info('signalling consumers to end')
+        q.put(None)
 
 
 def conductor(q, qs):
