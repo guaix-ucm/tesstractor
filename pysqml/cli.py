@@ -17,6 +17,7 @@ import serial
 
 from pysqml.sqm import SQMTest, SQMLU, filter_buffer
 import pysqml.mqtt as mqtt
+import pysqml.writef
 
 
 # FIXME: This is applied in two places
@@ -124,7 +125,7 @@ def build_dev_from_ini(section):
 
 
 def build_consumers_from_init(conf):
-    # valid values: mqtt, simple
+    # valid values: mqtt, simple, file
     consumers = []
     mqtt_sections = [sec for sec in conf.sections() if sec.startswith('mqtt')]
     for sec in mqtt_sections:
@@ -135,6 +136,11 @@ def build_consumers_from_init(conf):
     simple_sections = [sec for sec in conf.sections() if sec.startswith('simple')]
     for _ in simple_sections:
         consumers.append((simple_consumer, None))
+
+    file_sections = [sec for sec in conf.sections() if sec.startswith('file')]
+    print('filesections', file_sections)
+    for _ in file_sections:
+        consumers.append((pysqml.writef.consumer_write_file, None))
 
     return consumers
 
