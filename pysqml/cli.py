@@ -14,6 +14,8 @@ import signal
 import logging
 
 import serial
+import pytz
+import tzlocal
 
 from pysqml.sqm import SQMTest, SQMLU, filter_buffer
 import pysqml.mqtt as mqtt
@@ -47,13 +49,18 @@ def read_photometer_timed(sqm, q, exit_event):
         sqm.read_calibration()
 
         mac = sqm.serial_number
+        now = datetime.datetime.utcnow()
+        local_tz = tzlocal.get_localzone()
+
         payload_init = dict(
             name=sqm.name,
             mac=mac,
             calib=sqm.calibration,
             rev=1,
             chan="unknown",
-            cmd='id'
+            cmd='id',
+            tstamp=now,
+            localtz=local_tz
         )
 
         q.put(payload_init)
@@ -62,9 +69,13 @@ def read_photometer_timed(sqm, q, exit_event):
 
         while not do_exit:
             now = datetime.datetime.utcnow()
+            local_tz = tzlocal.get_localzone()
+            #now_utc = pytz.utc.localize(now)
+            #now_local = now_utc.astimezone(local_tz)
             msg = sqm.read_data()
             payload = dict(msg)
-            payload['tstamp'] = (now + _HALF_S).strftime("%Y-%m-%dT%H:%M:%S")
+            payload['tstamp'] = now
+            payload['localtz'] = local_tz
             payload['name'] = sqm.name
 
             buffer.append(payload)
@@ -130,19 +141,39 @@ def build_consumers_from_init(conf):
     mqtt_sections = [sec for sec in conf.sections() if sec.startswith('mqtt')]
     for sec in mqtt_sections:
         mqtt_config = conf[sec]
-        other_mqtt = mqtt.MqttConsumer(mqtt_config)
-        consumers.append((mqtt.consumer_mqtt, other_mqtt))
+        if mqtt_config.getboolean('enabled', True):
+            other_mqtt = mqtt.MqttConsumer(mqtt_config)
+            consumers.append((mqtt.consumer_mqtt, other_mqtt))
 
     simple_sections = [sec for sec in conf.sections() if sec.startswith('simple')]
     for _ in simple_sections:
         consumers.append((simple_consumer, None))
 
     file_sections = [sec for sec in conf.sections() if sec.startswith('file')]
-    print('filesections', file_sections)
-    for _ in file_sections:
+    for sec in file_sections:
+        print(conf[sec])
         consumers.append((pysqml.writef.consumer_write_file, None))
 
     return consumers
+
+def build_location_from_init(conf):
+    loc = LocationConf()
+    return loc
+
+
+class LocationConf:
+    contact_name = 'a'
+    organization = 'otr'
+    location = 'location'
+    province = 'provindece'
+    country = 'ES'
+    site = 'site'
+    #
+    latitude = 'lat'
+    longitude = 'lon'
+    elevation = 'elevea'
+    #
+    timezone = 'TZ'
 
 
 def main(args=None):
@@ -166,6 +197,7 @@ def main(args=None):
     sqmlist = [build_dev_from_ini(cparser[sec]) for sec in sqm_sections]
 
     consumers = build_consumers_from_init(cparser)
+    loc_conf = build_location_from_init(cparser)
 
     ncons = len(consumers)
     nsqm = len(sqmlist)

@@ -10,7 +10,7 @@ setup(
     license='GPLv3',
     description='Minimal SQM reading software',
     packages=['pysqml'],
-    install_requires=['pyserial', 'paho-mqtt'],
+    install_requires=['pytz', 'tzlocal', 'pyserial', 'paho-mqtt'],
     entry_points={
         'console_scripts': [
             'pysqm_lite = pysqml.cli:main'
