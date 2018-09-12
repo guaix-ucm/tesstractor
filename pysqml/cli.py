@@ -15,6 +15,7 @@ import logging
 
 import serial
 import pytz
+import attr
 import tzlocal
 
 from pysqml.sqm import SQMTest, SQMLU, filter_buffer
@@ -135,7 +136,19 @@ def build_dev_from_ini(section):
         return sqm
 
 
-def build_consumers_from_init(conf):
+class Conf:
+    pass
+
+
+def build_consumers_from_ini(conf):
+
+    # Read location first
+    loc_conf = build_location_from_ini(conf)
+
+    otherconf = Conf()
+    otherconf.location = loc_conf
+    otherconf.dirname = conf['file']['dirname']
+
     # valid values: mqtt, simple, file
     consumers = []
     mqtt_sections = [sec for sec in conf.sections() if sec.startswith('mqtt')]
@@ -151,29 +164,58 @@ def build_consumers_from_init(conf):
 
     file_sections = [sec for sec in conf.sections() if sec.startswith('file')]
     for sec in file_sections:
-        print(conf[sec])
-        consumers.append((pysqml.writef.consumer_write_file, None))
+        consumers.append((pysqml.writef.consumer_write_file, otherconf))
 
     return consumers
 
-def build_location_from_init(conf):
+def build_location_from_ini(conf):
+    location_sec = conf['location']
+
+    print(location_sec)
+    print(conf.options('location'))
     loc = LocationConf()
+    for key in location_sec:
+        setattr(loc, key, location_sec[key])
+
     return loc
 
 
+ini_defaults = {
+    'file': {
+        'dirname': '/var/lib/pysqm',
+    },
+    'provider': {
+        'contact_name': 'unknwon',
+        'organization': 'unkwnon'
+    },
+    'location': {
+        'location': 'unknwon',
+        'province': 'unknwon',
+        'country': 'unknwon',
+        'site': 'unknwon',
+        #
+        'latitude': 0.0,
+        'longitude': 0.0,
+        'elevation': 0.0,
+        #
+        'timezone': 'UTC'
+    }
+}
+
+@attr.s
 class LocationConf:
-    contact_name = 'a'
-    organization = 'otr'
-    location = 'location'
-    province = 'provindece'
-    country = 'ES'
-    site = 'site'
-    #
-    latitude = 'lat'
-    longitude = 'lon'
-    elevation = 'elevea'
-    #
-    timezone = 'TZ'
+    contact_name = attr.ib(default='')
+    organization = attr.ib(default='')
+    location = attr.ib(default='')
+    province = attr.ib(default='')
+    country = attr.ib(default='')
+    site = attr.ib(default='')
+
+    latitude = attr.ib(converter=float, default=0.0)
+    longitude = attr.ib(converter=float, default=0.0)
+    elevation = attr.ib(converter=float, default=0.0)
+
+    timezone = attr.ib(default='UTC')
 
 
 def main(args=None):
@@ -185,19 +227,29 @@ def main(args=None):
     logger = logging.getLogger(__name__)
 
     parser = argparse.ArgumentParser()
+    parser.add_argument('--dirname')
     parser.add_argument('-c', '--config')
 
     pargs = parser.parse_args(args=args)
-
+    print(pargs)
     cparser = configparser.ConfigParser()
+
+    cparser.read_dict(ini_defaults)
     if pargs.config:
         cparser.read(pargs.config)
+
+    ini_overrides = {
+        'file': {}
+    }
+    if pargs.dirname is not None:
+        ini_overrides['file']['dirname'] = pargs.dirname
+
+    cparser.read_dict(ini_overrides)
 
     sqm_sections = [sec for sec in cparser.sections() if sec.startswith('sqm_')]
     sqmlist = [build_dev_from_ini(cparser[sec]) for sec in sqm_sections]
 
-    consumers = build_consumers_from_init(cparser)
-    loc_conf = build_location_from_init(cparser)
+    consumers = build_consumers_from_ini(cparser)
 
     ncons = len(consumers)
     nsqm = len(sqmlist)

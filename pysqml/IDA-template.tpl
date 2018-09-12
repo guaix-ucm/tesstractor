@@ -31,6 +31,6 @@
 # blank line 31
 # blank line 32
 # UTC Date & Time, Local Date & Time, Temperature, Sky Temperature, Frequency, MSAS, ZP
-# YYYY-MM-DDTHH:mm:ss.ffffff;YYYY-MM-DDTHH:mm:ss.ffffff;Celsius;Celsius;Hz;mag/arcsec^2;mag/arcsec^2
+# YYYY-MM-DDTHH:mm:ss.fff;YYYY-MM-DDTHH:mm:ss.fff;Celsius;Celsius;Hz;mag/arcsec^2;mag/arcsec^2
 # END OF HEADER
 
