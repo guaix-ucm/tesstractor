@@ -129,7 +129,7 @@ def build_dev_from_ini(section):
         return SQMTest()
     else:
         name = section.get('name')
-        port = section.get('port', '/dev/ttyUSB')
+        port = section.get('port', '/dev/ttyUSB0')
         baudrate = section.get('baudrate', 115200)
         conn = serial.Serial(port, baudrate, timeout=2)
         sqm = SQMLU(conn, name)
@@ -140,14 +140,15 @@ class Conf:
     pass
 
 
-def build_consumers_from_ini(conf):
+def build_consumers_from_ini(conf, insconf):
 
     # Read location first
     loc_conf = build_location_from_ini(conf)
 
     otherconf = Conf()
     otherconf.location = loc_conf
-    otherconf.dirname = conf['file']['dirname']
+
+    otherconf.insconf = insconf
 
     # valid values: mqtt, simple, file
     consumers = []
@@ -163,7 +164,9 @@ def build_consumers_from_ini(conf):
         consumers.append((simple_consumer, None))
 
     file_sections = [sec for sec in conf.sections() if sec.startswith('file')]
-    for sec in file_sections:
+
+    for _ in file_sections:
+        otherconf.dirname = conf.get('file', 'dirname')
         consumers.append((pysqml.writef.consumer_write_file, otherconf))
 
     return consumers
@@ -171,8 +174,6 @@ def build_consumers_from_ini(conf):
 def build_location_from_ini(conf):
     location_sec = conf['location']
 
-    print(location_sec)
-    print(conf.options('location'))
     loc = LocationConf()
     for key in location_sec:
         setattr(loc, key, location_sec[key])
@@ -181,24 +182,22 @@ def build_location_from_ini(conf):
 
 
 ini_defaults = {
-    'file': {
-        'dirname': '/var/lib/pysqm',
-    },
     'provider': {
-        'contact_name': 'unknwon',
-        'organization': 'unkwnon'
+        'contact_name': 'unknown',
+        'organization': 'unknown'
     },
     'location': {
-        'location': 'unknwon',
-        'province': 'unknwon',
-        'country': 'unknwon',
-        'site': 'unknwon',
+        'locality': 'unknown',
+        'province': 'unknown',
+        'country': 'unknown',
+        'site': 'unknown',
         #
         'latitude': 0.0,
         'longitude': 0.0,
         'elevation': 0.0,
         #
-        'timezone': 'UTC'
+        'timezone': 'UTC',
+        'timesync': 'unknown'
     }
 }
 
@@ -206,7 +205,7 @@ ini_defaults = {
 class LocationConf:
     contact_name = attr.ib(default='')
     organization = attr.ib(default='')
-    location = attr.ib(default='')
+    locality = attr.ib(default='')
     province = attr.ib(default='')
     country = attr.ib(default='')
     site = attr.ib(default='')
@@ -216,6 +215,7 @@ class LocationConf:
     elevation = attr.ib(converter=float, default=0.0)
 
     timezone = attr.ib(default='UTC')
+    timesync = attr.ib(default='')
 
 
 def main(args=None):
@@ -231,17 +231,16 @@ def main(args=None):
     parser.add_argument('-c', '--config')
 
     pargs = parser.parse_args(args=args)
-    print(pargs)
-    cparser = configparser.ConfigParser()
+    cparser = configparser.ConfigParser(defaults={'dirname': '/var/lib/pysqm'})
 
     cparser.read_dict(ini_defaults)
     if pargs.config:
         cparser.read(pargs.config)
 
     ini_overrides = {
-        'file': {}
     }
     if pargs.dirname is not None:
+        ini_overrides['file'] = {}
         ini_overrides['file']['dirname'] = pargs.dirname
 
     cparser.read_dict(ini_overrides)
@@ -249,14 +248,19 @@ def main(args=None):
     sqm_sections = [sec for sec in cparser.sections() if sec.startswith('sqm_')]
     sqmlist = [build_dev_from_ini(cparser[sec]) for sec in sqm_sections]
 
-    consumers = build_consumers_from_ini(cparser)
-
-    ncons = len(consumers)
     nsqm = len(sqmlist)
 
     if nsqm == 0:
         logger.warning('No SQM devices defined. Exit')
         sys.exit(1)
+
+    sqmconf = []
+    for sqm in sqmlist:
+        sqm.start_connection()
+        sqmconf.append(sqm.static_conf())
+
+    consumers = build_consumers_from_ini(cparser, sqmconf[0])
+    ncons = len(consumers)
 
     if ncons == 0:
         logger.warning('No data consumers defined. Exit')

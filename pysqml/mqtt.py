@@ -63,18 +63,18 @@ class MqttConsumer:
 
     def do_work1(self, msg):
         if msg['cmd'] == 'id':
-            del msg['cmd']
-            msg['chan'] = msg['name']
+            payload = dict(msg)
+            del payload['cmd']
+            del payload['localtz']
+            # round to nearest second
+            payload['tstamp'] = (msg['tstamp'] + _HALF_S).strftime("%FT%T")
 
-            spayload = json.dumps(msg)
+            spayload = json.dumps(payload)
             _logger.debug('sending register msg %s', spayload)
             response = self.client.publish(self.config['register_topic'], spayload)
             return response
         elif msg['cmd'] == 'r':
-            del msg['cmd']
-
             payload = dict(seq=0, name='unknown', freq=0.0, mag=0.0, tamb=0.0, tsky=0.0, rev=1)
-
             payload['seq'] = msg['seq']
             payload['name'] = msg['name']
             payload['freq'] = msg['period_sensor']

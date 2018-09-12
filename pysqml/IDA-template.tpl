@@ -3,12 +3,12 @@
 # Number of header lines: 35
 # This data is released under the following license: ODbL 1.0 http://opendatacommons.org/licenses/odbl/summary/
 # Device type: {instrument.model}
-# Instrument ID: {instrument.name}
+# Instrument ID: {instrument.serial_number}
 # Data supplier: {location.contact_name} / {location.organization}
-# Location name: {location.location}/{location.province}/{location.country} - {location.site}
+# Location name: {location.locality}/{location.province}/{location.country} - {location.site}
 # Position: {location.latitude}, {location.longitude}, {location.elevation}
 # Local timezone: {location.timezone}
-# Time Synchronization: timestamp added by MQTT subscriber
+# Time Synchronization: {location.timesync}
 # Moving / Stationary position: STATIONARY
 # Moving / Fixed look direction: FIXED
 # Number of channels: 1
@@ -16,12 +16,12 @@
 # Measurement direction per channel: {instrument.azimuth}, 90.0 - {instrument.altitude}
 # Field of view: {instrument.fov}
 # Number of fields per line: 6
-# TESS MAC address: {instrument.mac_address}
-# TESS firmware version: {instrument.firmware}
-# TESS cover offset value: {instrument.cover_offset}
-# TESS zero point (latest):  {instrument.zero_point}
-# Comment:  COMMENT
-# Comment:
+# SQM serial number: {instrument.serial_number}
+# SQM firmware version: {instrument.firmware}
+# SQM cover offset value: -0.11
+# SQM readout test ix: {instrument.ix_readout}
+# SQM readout test rx: {instrument.rx_readout}
+# SQM readout test cx: {instrument.cx_readout}
 # Comment:
 # Comment:
 # Comment:

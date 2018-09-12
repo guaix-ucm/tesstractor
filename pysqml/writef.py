@@ -61,19 +61,6 @@ class TimedDailyRotator:
         return TimeInterval(a, b)
 
 
-class InstrumentConf:
-    name = 'somename'
-    filter = 'b'
-    azimuth = 0.0
-    altitude = 0.0
-    model = 'model'
-    fov = 'fov'
-    mac_address = 'xxx'
-    firmware = 'firmware'
-    cover_offset = 0
-    zero_point = 29
-
-
 def calc_filename(now, name):
     fname_tmpl = '{date:%Y%m%d_%H%M%S}_{name}.dat'
     return fname_tmpl.format(date=now, name=name)
@@ -149,14 +136,17 @@ def consumer_write_file(q, other):
 
     create, valid_fname = startup(valid_inter, other.dirname)
 
-    insconf = InstrumentConf()
-    locconf = other.location
+    insconf = other.insconf
 
     if create:
         valid_fname = calc_filename(ref_dt, name=insconf.name)
         _logger.debug('valid file not found')
         _logger.debug('create %s', valid_fname)
-        init_file(os.path.join(other.dirname, valid_fname), insconf, locconf)
+        init_file(
+            os.path.join(other.dirname, valid_fname),
+            insconf,
+            other.location
+        )
     else:
         _logger.debug('valid file is %s', valid_fname)
 
@@ -167,6 +157,7 @@ def consumer_write_file(q, other):
             _logger.debug('got (w) payload %s', payload)
             # write_to_file_3(payload, None)
             payload = update_p(payload)
+            payload['zero_point'] = other.insconf.zero_point
             now_local = payload['tstamp_local']
             now_local_n = now_local.replace(tzinfo=None)
             if now_local_n >= next_change:
@@ -175,7 +166,12 @@ def consumer_write_file(q, other):
                 _logger.debug('compute next change')
                 valid_inter = rot.in_interval(now_local_n)
                 next_change = valid_inter.max_val
-                valid_fname = calc_filename(now_local_n, name='somename')
+                valid_fname = calc_filename(now_local_n, name=insconf.name)
+                init_file(
+                    os.path.join(other.dirname, valid_fname),
+                    insconf,
+                    other.location
+                )
             _logger.debug('write to file')
             write_to_file(payload, other.dirname, valid_fname)
             q.task_done()
@@ -200,9 +196,8 @@ def write_to_file(payload, dirname, filename):
     payload['tstamp_str'] = payload['tstamp'].isoformat('T', timespec='milliseconds')
     payload['tstamp_local_str'] = payload['tstamp_local'].replace(tzinfo=None).isoformat('T', timespec='milliseconds')
     # m.isoformat('T', timespec='milliseconds')
-    line_tpl = "{tstamp_str};{tstamp_local_str};0;{temp_sensor};{freq_sensor};{sky_brightness};0"
+    line_tpl = "{tstamp_str};{tstamp_local_str};0;{temp_sensor};{freq_sensor};{sky_brightness};{zero_point}"
     with open(os.path.join(dirname, filename), 'a') as fd:
-        print(payload)
         if payload['cmd'] == 'r':
             msg = line_tpl.format(**payload)
             print(msg, file=fd)
