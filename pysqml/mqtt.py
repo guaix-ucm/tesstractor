@@ -10,7 +10,6 @@
 import datetime
 import logging
 import json
-import socket
 
 import paho.mqtt.client as mqtt
 
@@ -22,7 +21,6 @@ _logger = logging.getLogger(__name__)
 
 def consumer_mqtt(q, other):
     _logger.info('starting MQTT consumer')
-
     try:
         other.connect()
         other.client.loop_start()
@@ -46,7 +44,10 @@ class MqttConsumer:
     def __init__(self, config):
         self.client = mqtt.Client()
         self.config = config
+        self.seq = 1
 
+        self.MSG = '"seq": {seq}, "name": "{name}", "freq": {freq:.3f}, "mag": {mag:.2f},' \
+                   ' "tamb": {tamb:.1f}, "tsky": {tsky:.1f}, "rev": {rev}, "tstamp": "{tstamp}"'
     # client.loop_start()
 
     def connect(self):
@@ -63,29 +64,44 @@ class MqttConsumer:
 
     def do_work1(self, msg):
         if msg['cmd'] == 'id':
+            _logger.debug('enter register')
+            # reset sequence number
+            self.seq = 1
             payload = dict(msg)
             del payload['cmd']
             del payload['localtz']
+            if 'tstamp_local' in payload:
+                del payload['tstamp_local']
             # round to nearest second
             payload['tstamp'] = (msg['tstamp'] + _HALF_S).strftime("%FT%T")
+            payload['chan'] = self.config['publish_topic'].format(name=msg['name'])
 
             spayload = json.dumps(payload)
             _logger.debug('sending register msg %s', spayload)
             response = self.client.publish(self.config['register_topic'], spayload)
             return response
         elif msg['cmd'] == 'r':
-            payload = dict(seq=0, name='unknown', freq=0.0, mag=0.0, tamb=0.0, tsky=0.0, rev=1)
-            payload['seq'] = msg['seq']
+            _logger.debug('enter publish')
+            payload = dict(seq=self.seq, name='unknown', freq=0.0, mag=0.0, tamb=99.0, tsky=99.0, rev=1)
+            self.seq += 1
+            # This may depend on the device
             payload['name'] = msg['name']
-            payload['freq'] = msg['period_sensor']
-            payload['mag'] = msg['sky_brightness']
-            payload['tamb'] = msg['temp_sensor']
+            payload['freq'] = msg['freq']
+            payload['mag'] = msg['magnitude']
+            if 'temp_ambient' in msg:
+                payload['tamb'] = msg['temp_ambient']
+            if 'temp_sky' in msg:
+                payload['tsky'] = msg['temp_sky']
             # round to nearest second
             payload['tstamp'] = (msg['tstamp'] + _HALF_S).strftime("%FT%T")
-            spayload = json.dumps(payload)
+
+            spayload = self.MSG.format(**payload)
+            spayload = '{{{}}}'.format(spayload)
+            # With this I can't control numeric precision
+            # spayload = json.dumps(payload)
             publish_topic = self.config['publish_topic'].format(**payload)
             response = self.client.publish(publish_topic, spayload, qos=0)
             _logger.debug('sending data %s', spayload)
             return response
         else:
-            raise ValueError
+            raise ValueError('MQTT.do_work1, msg cmd is unknown')

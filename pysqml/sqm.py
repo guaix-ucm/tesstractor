@@ -13,15 +13,17 @@ import time
 import re
 import math
 
+from .device import Device
+
 
 MEASURE_RE = re.compile(br"""
                 \s* # Skip whitespace
                 (?P<cmd>r),
-                (?P<sky_brightness>[\-\s]\d{2}\.\d{2})m,
-                (?P<freq_sensor>\d{10})Hz,
-                (?P<ticks_uC>\d{10})c,
-                (?P<period_sensor>\d{7}\.\d{3})s,
-                (?P<temp_sensor>[\-\s]\d{3}\.\d)C
+                (?P<magnitude>[\-\s]\d{2}\.\d{2})m,
+                (?P<freq>\d{10})Hz,
+                (?P<period_counts>\d{10})c,
+                (?P<period>\d{7}\.\d{3})s,
+                (?P<temp_ambient>[\-\s]\d{3}\.\d)C
                 """, re.VERBOSE)
 
 CALIB_RE = re.compile(br"""
@@ -60,9 +62,9 @@ class SQMConf:
     cx_readout = ""
 
 
-class SQM:
+class SQM(Device):
     def __init__(self, name="unknown", model='unknown'):
-        super(SQM, self).__init__()
+        super().__init__()
         # Get Photometer identification codes
 
         self.name = name
@@ -80,7 +82,7 @@ class SQM:
 
     def static_conf(self):
         conf = SQMConf()
-        conf.name = self.serial_number
+        conf.name = self.name
         conf.model = self.model
         conf.serial_number = self.serial_number
         conf.firmware = self.feature_number
@@ -90,6 +92,14 @@ class SQM:
         conf.cx_readout = self.cx_readout
         conf.zero_point = self.calibration
         return conf
+
+    def filter_buffer(self, payloads):
+
+        return filter_buffer(payloads)
+
+    @classmethod
+    def filter_buffer2(cls, payloads):
+        return filter_buffer(payloads)
 
     def process_metadata(self, match):
         if match:
@@ -104,20 +114,22 @@ class SQM:
                     'feature_number': self.feature_number,
                     'serial_number': self.serial_number}
         else:
-            raise ValueError
+            raise ValueError('process_metadata')
 
     def process_data(self, match):
         if match:
             self.rx_readout = match.group()
             result = {}
+            result['name'] = self.name
+            result['model'] = 'SQM'
             result['cmd'] = match.group('cmd').decode('utf-8')
-            result['sky_brightness'] = float(match.group('sky_brightness'))
-            result['freq_sensor'] = int(match.group('freq_sensor'))
-            result['period_sensor'] = float(match.group('period_sensor'))
-            result['temp_sensor'] = float(match.group('temp_sensor'))
+            result['magnitude'] = float(match.group('magnitude'))
+            result['freq'] = int(match.group('freq'))
+            result['period'] = float(match.group('period'))
+            result['temp_ambient'] = float(match.group('temp_ambient'))
             return result
         else:
-            raise ValueError
+            raise ValueError('process_data')
 
     def process_calibration(self, match):
         if match:
@@ -125,7 +137,7 @@ class SQM:
             self.calibration = float(match.group('light_cal'))
             return {'cmd': 'c', 'calibration': self.calibration}
         else:
-            raise ValueError
+            raise ValueError('process_calibration')
 
     def start_connection(self):
         pass
@@ -215,7 +227,6 @@ class SQM:
             logger.debug("msg is %s", msg)
             match = MEASURE_RE.match(msg)
             if match:
-                logger.debug('process data')
                 pmsg = self.process_data(match)
                 logger.debug('data is %s', pmsg)
                 return pmsg
@@ -228,7 +239,7 @@ class SQM:
                 time.sleep(self.cmd_wait)
 
         logger.error('reading data after %d tries', tries)
-        raise ValueError
+        raise ValueError('read_data')
 
     def pass_command(self, cmd):
         pass
@@ -305,11 +316,11 @@ class SQMTest(SQM):
 
 
 def filter_buffer(payloads):
-    mags = [p['sky_brightness'] for p in payloads]
+    mags = [p['magnitude'] for p in payloads]
     avg_mag = average_mags(mags)
     # return avg payload
     avg_payload = dict(payloads[0])
-    avg_payload['sky_brightness'] = avg_mag
+    avg_payload['magnitude'] = avg_mag
     return avg_payload
 
 

@@ -15,12 +15,18 @@ import glob
 import os.path
 
 import pytz
-import tzlocal
+
 
 _logger = logging.getLogger(__name__)
 
-# HALF_DAY = datetime.timedelta(days=0.5)
 
+# FIXME: simplify this
+IDA_TMPL = {
+    'TESS': 'IDA-TESS-template.tpl',
+    'TESS-R': 'IDA-TESS-template.tpl',
+    'SQM': 'IDA-SQM-template.tpl',
+    'SQM-TEST': 'IDA-SQM-template.tpl'
+}
 
 class TimeInterval:
     def __init__(self, min_val, max_val):
@@ -67,18 +73,20 @@ def calc_filename(now, name):
 
 
 def init_file(filename, insconf, locconf):
-    tmpl_b = pkgutil.get_data('pysqml', 'IDA-template.tpl')
+    model = insconf.model
+    tmpl_path = IDA_TMPL[model]
+    tmpl_b = pkgutil.get_data('pysqml', tmpl_path)
     template_string = tmpl_b.decode('utf-8')
     with open(filename, 'w') as fd:
         sus = template_string.format(instrument=insconf, location=locconf)
         print(sus[:-1], end='', file=fd)
 
 
-def startup(time_interval, dirname):
+def startup(time_interval, name, dirname):
 
-    # for f in glob.glob(os.path.join(dirname, '*_*_*.dat')):
     candidates = []
-    for f in glob.glob(os.path.join(dirname, '????????_??????_*.dat')):
+    glob_pattern = '????????_??????_{}.dat'.format(name)
+    for f in glob.glob(os.path.join(dirname, glob_pattern)):
         # A RE would be more general?
         g = os.path.basename(f)
         r = g.split('_')
@@ -134,9 +142,9 @@ def consumer_write_file(q, other):
     next_change = valid_inter.max_val
     _logger.debug('from %s upto %s', last_change, next_change)
 
-    create, valid_fname = startup(valid_inter, other.dirname)
-
     insconf = other.insconf
+
+    create, valid_fname = startup(valid_inter, insconf.name, other.dirname)
 
     if create:
         valid_fname = calc_filename(ref_dt, name=insconf.name)
@@ -196,11 +204,13 @@ def write_to_file(payload, dirname, filename):
     payload['tstamp_str'] = payload['tstamp'].isoformat('T', timespec='milliseconds')
     payload['tstamp_local_str'] = payload['tstamp_local'].replace(tzinfo=None).isoformat('T', timespec='milliseconds')
     # m.isoformat('T', timespec='milliseconds')
-    line_tpl = "{tstamp_str};{tstamp_local_str};0;{temp_sensor};{freq_sensor};{sky_brightness};{zero_point}"
+    line_tpl = "{tstamp_str};{tstamp_local_str};{temp_sky};{temp_ambient};{freq};{magnitude:.2f};{zero_point}"
     with open(os.path.join(dirname, filename), 'a') as fd:
         if payload['cmd'] == 'r':
+            if 'temp_ambient' not in payload:
+                payload['temp_ambient'] = 99.0
+            if 'temp_sky' not in payload:
+                payload['temp_sky'] = 99.0
             msg = line_tpl.format(**payload)
             print(msg, file=fd)
     return 0
-
-
