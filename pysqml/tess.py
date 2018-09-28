@@ -91,11 +91,11 @@ class Tess(Device):
         # temps
         result = {}
         result['cmd'] = 'r'
-        result['freq'] = 1
-        result['magnitude'] = 18.0
-        # result['zeropoint'] = self.calibration
+        result['freq'] = 0.0
+        result['magnitude'] = 99.0
         result['name'] = self.name
         result['model'] = 'TESS'
+        result['freq_sensor'] = 0.0
 
         if re_m['freq_pref'] is None:
             return result
@@ -170,11 +170,18 @@ class Tess(Device):
         # we have to average
         # tstamp, freq, freq_sensor, magnitude
         # magnitude corresponds to the mag of the average freq
-        for key in ['freq_sensor']:
-            result[key] = sum(p[key] for p in payloads) / npayloads
-
-        result['freq'] = result['freq_sensor'] / 1000.0
-        result['magnitude'] = self.calibration - 2.5 * math.log10(result['freq'])
+        if any([p['freq'] <= 0 for p in payloads]):
+            # FIXME: over/underflow
+            result['freq'] = result['freq_sensor'] = 0
+            result['magnitude'] = 99
+        else:
+            for key in ['freq_sensor']:
+                result[key] = sum(p[key] for p in payloads) / npayloads
+            print(result['freq'])
+            print([p['freq'] <= 0 for p in payloads])
+            print(any([p['freq'] <= 0 for p in payloads]))
+            result['freq'] = result['freq_sensor'] / 1000.0
+            result['magnitude'] = self.calibration - 2.5 * math.log10(result['freq'])
 
         # average times
         ts0 = payloads[0]['tstamp']
