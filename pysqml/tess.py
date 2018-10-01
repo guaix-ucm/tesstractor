@@ -62,6 +62,7 @@ class Tess(Device):
         conf.serial_number = self.serial_number
         conf.firmware = self.feature_number
         conf.zero_point = self.calibration
+        conf.mac_address = self.mac
         return conf
 
     def process_metadata(self, match):

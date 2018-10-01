@@ -16,12 +16,12 @@
 # Measurement direction per channel: {instrument.azimuth}, 90.0 - {instrument.altitude}
 # Field of view: {instrument.fov}
 # Number of fields per line: 6
-# SQM serial number: {instrument.serial_number}
-# SQM firmware version: {instrument.firmware}
-# SQM cover offset value: -0.11
-# SQM readout test ix: {instrument.ix_readout}
-# SQM readout test rx: {instrument.rx_readout}
-# SQM readout test cx: {instrument.cx_readout}
+# TESS MAC address: {instrument.mac_address}
+# TESS firmware version: {instrument.firmware}
+# TESS cover offset value: {instrument.cover_offset}
+# TESS zero point (latest): {instrument.zero_point}
+# Comment:
+# Comment:
 # Comment:
 # Comment:
 # Comment:

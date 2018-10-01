@@ -17,6 +17,7 @@ class PhotometerConf:
     name = 'somename'
     model = 'somemodel'
     serial_number = 1
+    mac_address = "01:23:45:67:89:AB"
     filter = 'b'
     azimuth = 0.0
     altitude = 0.0
