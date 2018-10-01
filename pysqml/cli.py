@@ -115,6 +115,8 @@ def build_dev_from_ini(section):
             name='TESS-test'
 
         photo_dev = pysqml.tess.TessR(conn, name)
+        zero_point = section.getfloat('zero_point', 20.0)
+        photo_dev.calibration = zero_point
         # FIXME: workaround to handle MAC
         mac = section.get('mac')
         if mac:
