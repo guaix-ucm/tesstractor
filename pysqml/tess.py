@@ -14,7 +14,7 @@ import re
 import math
 import datetime
 
-from .device import Device
+from .device import Device, PhotometerConf
 
 
 MEASURE_RE = re.compile(br"""
@@ -32,24 +32,11 @@ MEASURE_RE = re.compile(br"""
     """, re.VERBOSE)
 
 
-
 _logger = logging.getLogger(__name__)
 
-# FIXME: redundant with SQMConf
-class TESSConf:
-    name = 'somename'
-    model = 'SQM-LU'
-    serial_number = 1
-    filter = 'b'
-    azimuth = 0.0
-    altitude = 0.0
-    fov = 20
-    firmware = 29
-    cover_offset = -0.11
-    zero_point = 29
-    ix_readout = ""
-    rx_readout = ""
-    cx_readout = ""
+
+class TESSConf(PhotometerConf):
+    pass
 
 
 class Tess(Device):

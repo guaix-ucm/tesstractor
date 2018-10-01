@@ -13,7 +13,7 @@ import time
 import re
 import math
 
-from .device import Device
+from .device import Device, PhotometerConf
 
 
 MEASURE_RE = re.compile(br"""
@@ -46,20 +46,8 @@ META_RE = re.compile(br"""
 _logger = logging.getLogger(__name__)
 
 
-class SQMConf:
-    name = 'somename'
-    model = 'SQM-LU'
-    serial_number = 1
-    filter = 'b'
-    azimuth = 0.0
-    altitude = 0.0
-    fov = 20
-    firmware = 29
-    cover_offset = -0.11
-    zero_point = 29
-    ix_readout = ""
-    rx_readout = ""
-    cx_readout = ""
+class SQMConf(PhotometerConf):
+    pass
 
 
 class SQM(Device):
