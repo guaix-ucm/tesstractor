@@ -1,8 +1,0 @@
-[Unit]
-Description=PySQM-lite reader
-
-[Service]
-ExecStart=%h/.local/bin/pysqm_lite -c %h/config.ini
-
-[Install]
-WantedBy=default.target

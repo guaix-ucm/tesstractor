@@ -75,7 +75,7 @@ def calc_filename(now, name):
 def init_file(filename, insconf, locconf):
     model = insconf.model
     tmpl_path = IDA_TMPL[model]
-    tmpl_b = pkgutil.get_data('pysqml', tmpl_path)
+    tmpl_b = pkgutil.get_data('tesstractor', tmpl_path)
     template_string = tmpl_b.decode('utf-8')
     with open(filename, 'w') as fd:
         sus = template_string.format(instrument=insconf, location=locconf)

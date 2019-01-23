@@ -1,0 +1,8 @@
+[Unit]
+Description=TESStractor reader
+
+[Service]
+ExecStart=%h/.local/bin/tesstractor -c %h/config.ini
+
+[Install]
+WantedBy=default.target

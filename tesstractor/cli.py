@@ -18,14 +18,14 @@ import sys
 import serial
 import attr
 
-from pysqml.sqm import SQMTest, SQMLU
-from pysqml.tess import Tess
-import pysqml.mqtt as mqtt
-import pysqml.writef
-import pysqml.tess
-import pysqml.cli
+from tesstractor.sqm import SQMTest, SQMLU
+from tesstractor.tess import Tess
+import tesstractor.mqtt as mqtt
+import tesstractor.writef
+import tesstractor.tess
+import tesstractor.cli
 
-from pysqml.workers import splitter, simple_buffer, timed_task, read_photometer_timed
+from tesstractor.workers import splitter, simple_buffer, timed_task, read_photometer_timed
 
 
 def signal_handler_function(signum, frame, exit_event):
@@ -114,7 +114,7 @@ def build_dev_from_ini(section):
             print('name is none, this should be automatic')
             name='TESS-test'
 
-        photo_dev = pysqml.tess.TessR(conn, name)
+        photo_dev = tesstractor.tess.TessR(conn, name)
         zero_point = section.getfloat('zero_point', 20.0)
         photo_dev.calibration = zero_point
         # FIXME: workaround to handle MAC
@@ -166,8 +166,8 @@ def create_file_writer_workers(q_worker, file_config):
                                      args=(q_worker, q_file_in, q_buffer, otherx))
 
 
-    consumer_file = threading.Thread(target=pysqml.writef.consumer_write_file, name='consumer_write_file',
-                            args=(q_file_in, file_config))
+    consumer_file = threading.Thread(target=tesstractor.writef.consumer_write_file, name='consumer_write_file',
+                                     args=(q_file_in, file_config))
 
     interval = file_config.interval
     timed_buffer = threading.Timer(interval, timed_task, args=(q_buffer, q_file_in, send_event))
@@ -183,7 +183,7 @@ def create_file_writer_workers(q_worker, file_config):
 def main(args=None):
     logging.basicConfig(level=logging.DEBUG)
     logger = logging.getLogger(__name__)
-    logger.info('pysqml-lite, starting')
+    logger.info('tesstractor-lite, starting')
 
     # Register events and signal
     exit_event = threading.Event()

@@ -1,22 +1,15 @@
-PySQM-lite
-==========
+TESStractor
+===========
 
-This is a lite version of PySQM.
+Tesstractor is a software designed to read data from
+TESS photometers (http://tess.stars4all.eu/).
 
-PySQM is a software designed to read and plot data from
-Unihedron SQM-LE and SQM-LU photometers. It was originally developed by
-Mireia Nievas (https://github.com/mireianievas).
+This software reads data also from Unihedron SQM-LU photometers.
 
-This lite version has been tested with SQM-LU photometers.
-SQM-LE are not cuurently supported. The readings of the photometers
-are send to a MQTT server.
-
-Future features
----------------
-The following features will be readded:
-
-  * SQM-LE photometers
-  * Text files in IDA format
+Tesstractor is distributed under GNU GPL, either version 3 of the License,
+or (at your option) any later version. See the file LICENSE.txt for details.
 
 
+Webpage: https://github.com/guaix-ucm/tesstractor
+Maintainer: sergiopr@fis.ucm.es
 

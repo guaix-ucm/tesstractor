@@ -1,1 +1,1 @@
-KERNEL=="ttyUSB[0-9]*", SUBSYSTEM=="tty", SUBSYSTEMS=="usb-serial", ATTRS{idVendor}=="0403", ATTRS{idProduct}=="6001", TAG+="systemd", ENV{SYSTEMD_WANTS}="sqm_reader.service"
+KERNEL=="ttyUSB[0-9]*", SUBSYSTEM=="tty", SUBSYSTEMS=="usb-serial", ATTRS{idVendor}=="0403", ATTRS{idProduct}=="6001", TAG+="systemd", ENV{SYSTEMD_WANTS}="tesstractor.service"

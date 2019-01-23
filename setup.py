@@ -2,18 +2,18 @@
 from setuptools import setup
 
 setup(
-    name='pysqml',
+    name='tesstractor',
     version='0.1',
     author='Sergio Pascual',
     author_email='sergiopr@fis.ucm.es',
-    url='http://guaix.fis.ucm.es/hg/pysqml/',
+    url='https://github.com/guaix-ucm/tesstractor',
     license='GPLv3',
-    description='Minimal SQM reading software',
-    packages=['pysqml'],
+    description='TESS photometer reading software',
+    packages=['tesstractor'],
     install_requires=['pytz', 'tzlocal', 'pyserial', 'paho-mqtt'],
     entry_points={
         'console_scripts': [
-            'pysqm_lite = pysqml.cli:main'
+            'tesstractor = tesstractor.cli:main'
         ]
     },
     zip_safe=False,
@@ -21,6 +21,7 @@ setup(
         "Programming Language :: C",
         "Programming Language :: Cython",
         "Programming Language :: Python :: 3.6",
+        "Programming Language :: Python :: 3.7",
         "Programming Language :: Python :: Implementation :: CPython",
         'Development Status :: 3 - Alpha',
         "Environment :: Other Environment",

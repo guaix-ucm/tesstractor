@@ -17,8 +17,8 @@ import queue
 
 # FIXME: this is for filter buffer2
 # this can be done better
-from pysqml.tess import Tess
-from pysqml.sqm import SQM
+from tesstractor.tess import Tess
+from tesstractor.sqm import SQM
 
 
 filter_buffer_map = {
