@@ -1,5 +1,4 @@
-TESStractor
-===========
+## TESStractor ##
 
 Tesstractor is a software designed to read data from
 TESS photometers (http://tess.stars4all.eu/).
