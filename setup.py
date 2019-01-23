@@ -3,7 +3,7 @@ from setuptools import setup
 
 setup(
     name='tesstractor',
-    version='0.1',
+    version='0.1dev0',
     author='Sergio Pascual',
     author_email='sergiopr@fis.ucm.es',
     url='https://github.com/guaix-ucm/tesstractor',
