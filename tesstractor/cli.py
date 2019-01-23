@@ -1,7 +1,7 @@
 #
-# Copyright 2018 Universidad Complutense de Madrid
+# Copyright 2018-2019 Universidad Complutense de Madrid
 #
-# This file is part of pysqm-lite
+# This file is part of tesstractor
 #
 # SPDX-License-Identifier: GPL-3.0+
 # License-Filename: LICENSE.txt
@@ -23,7 +23,7 @@ from tesstractor.tess import Tess
 import tesstractor.mqtt as mqtt
 import tesstractor.writef
 import tesstractor.tess
-import tesstractor.cli
+
 
 from tesstractor.workers import splitter, simple_buffer, timed_task, read_photometer_timed
 

@@ -1,7 +1,7 @@
 #
-# Copyright 2018 Universidad Complutense de Madrid
+# Copyright 2018-2019 Universidad Complutense de Madrid
 #
-# This file is part of pysqm-lite
+# This file is part of tesstractor
 #
 # SPDX-License-Identifier: GPL-3.0+
 # License-Filename: LICENSE.txt
