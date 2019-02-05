@@ -25,6 +25,7 @@ IDA_TMPL = {
     'TESS': 'IDA-TESS-template.tpl',
     'TESS-R': 'IDA-TESS-template.tpl',
     'SQM': 'IDA-SQM-template.tpl',
+    'SQM-LU': 'IDA-SQM-template.tpl',
     'SQM-TEST': 'IDA-SQM-template.tpl'
 }
 

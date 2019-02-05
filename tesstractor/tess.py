@@ -165,9 +165,9 @@ class Tess(Device):
         else:
             for key in ['freq_sensor']:
                 result[key] = sum(p[key] for p in payloads) / npayloads
-            print(result['freq'])
-            print([p['freq'] <= 0 for p in payloads])
-            print(any([p['freq'] <= 0 for p in payloads]))
+            # print(result['freq'])
+            # print([p['freq'] <= 0 for p in payloads])
+            # print(any([p['freq'] <= 0 for p in payloads]))
             result['freq'] = result['freq_sensor'] / 1000.0
             result['magnitude'] = self.calibration - 2.5 * math.log10(result['freq'])
 

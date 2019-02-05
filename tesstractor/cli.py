@@ -36,7 +36,7 @@ class Conf:
     pass
 
 
-class Other:
+class OtherConf:
     pass
 
 
@@ -89,8 +89,12 @@ def build_location_from_ini(conf):
 
 
 def build_dev_from_ini(section):
-    model = section.get('model', 'test')
-    if model == 'test':
+
+    logger = logging.getLogger(__name__)
+
+    model = section.get('model', 'SQM-TEST')
+    logger.debug('model is %s', model)
+    if model == 'SQM-TEST':
         return SQMTest()
     elif model == 'SQM-LU':
         name = section.get('name')
@@ -111,7 +115,7 @@ def build_dev_from_ini(section):
         timeout = section.getfloat('timeout', 1.0)
         conn = serial.Serial(port, baudrate, timeout=timeout)
         if name is None:
-            print('name is none, this should be automatic')
+            logger.warning('name is none, this should be automatic')
             name='TESS-test'
 
         photo_dev = tesstractor.tess.TessR(conn, name)
@@ -129,13 +133,13 @@ def build_dev_from_ini(section):
 
 def create_mqtt_workers(q_worker, mqtt_config):
 
-    otherx = Other()
+    otherx = OtherConf()
     #otherx.send_event = send_event
 
     q_mqtt_in = queue.Queue() # Queue for MQTT
     q_buffer = queue.Queue() # Queue for MQTT buffer
 
-    filter_thread = threading.Thread(target=simple_buffer, name='simple_filter1',
+    filter_thread = threading.Thread(target=simple_buffer, name='simple_filter_mqtt',
                                      args=(q_worker, q_mqtt_in, q_buffer, otherx))
 
     interval = mqtt_config.getfloat('interval', 60.0)
@@ -157,12 +161,12 @@ def create_mqtt_workers(q_worker, mqtt_config):
 
 def create_file_writer_workers(q_worker, file_config):
 
-    otherx = Other()
+    otherx = OtherConf()
     q_file_in = queue.Queue() # Queue for file writer
     q_buffer = queue.Queue()  # Queue for file writer buffer
     send_event = None
 
-    filter_thread = threading.Thread(target=simple_buffer, name='simple_filter2',
+    filter_thread = threading.Thread(target=simple_buffer, name='simple_filter_file',
                                      args=(q_worker, q_file_in, q_buffer, otherx))
 
 
@@ -183,7 +187,7 @@ def create_file_writer_workers(q_worker, file_config):
 def main(args=None):
     logging.basicConfig(level=logging.DEBUG)
     logger = logging.getLogger(__name__)
-    logger.info('tesstractor-lite, starting')
+    logger.info('tesstractor, starting')
 
     # Register events and signal
     exit_event = threading.Event()
@@ -201,9 +205,18 @@ def main(args=None):
     parser = argparse.ArgumentParser()
     parser.add_argument('--dirname')
     parser.add_argument('-c', '--config')
+    parser.add_argument('-g', '--generate-config', action='store_true')
 
     pargs = parser.parse_args(args=args)
-    cparser = configparser.ConfigParser(defaults={'dirname': '/var/lib/pysqm'})
+
+    if pargs.generate_config:
+        # write the default config file
+        import pkgutil
+        data = pkgutil.get_data('tesstractor', 'base.ini')
+        print(data.decode('utf-8'))
+        return 0
+
+    cparser = configparser.ConfigParser(defaults={'dirname': '/var/lib/tesstractor'})
 
     cparser.read_dict(ini_defaults)
     if pargs.config:
@@ -217,55 +230,70 @@ def main(args=None):
 
     cparser.read_dict(ini_overrides)
 
-    # FIXME: Here, we should use only the first enabled
+    loc_conf = build_location_from_ini(cparser)
+
     photo_sections = [sec for sec in cparser.sections() if sec.startswith('photometer')]
-    photolist = [build_dev_from_ini(cparser[sec]) for sec in photo_sections]
+
+    photolist = []
+    for secname in photo_sections:
+        section = cparser[secname]
+        if section.getboolean('enabled', True):
+            newdev = build_dev_from_ini(section)
+            photolist.append(newdev)
 
     nsqm = len(photolist)
 
     if nsqm == 0:
-        logger.warning('No devices defined. Exit')
+        logger.warning('No devices enabled. Exit')
         sys.exit(1)
 
-    photoconf = []
-    for photodev in photolist:
-        photodev.start_connection()
-        photoconf.append(photodev.static_conf())
+    #photoconf = []
+    #for photodev in photolist:
+    #    photodev.start_connection()
+    #    photoconf.append(photodev.static_conf())
 
+    # Using first device
     photo_dev = photolist[0]
 
     photo_dev.start_connection()
-    loc_conf = build_location_from_ini(cparser)
 
     # Working queues
     q_cons = []
     # joinable threads
     j_threads = []
 
-    conf = cparser
-    mqtt_sections = [sec for sec in conf.sections() if sec.startswith('mqtt')]
-    for sec in mqtt_sections:
-        mqtt_config = conf[sec]
+    # Section for MQTT connections
+    mqtt_sections = [sec for sec in cparser.sections() if sec.startswith('mqtt')]
+    for sec_name in mqtt_sections:
+        logger.info('creating MQTT conection')
+        mqtt_config = cparser[sec_name]
         if mqtt_config.getboolean('enabled', True):
             q_w = queue.Queue()
             ts = create_mqtt_workers(q_w, mqtt_config)
             q_cons.append(q_w)
             j_threads.extend(ts)
+        else:
+            logger.info('MQTT section %s disabled', sec_name)
 
-    file_sections = [sec for sec in conf.sections() if sec.startswith('file')]
+    # Section for files
+    file_sections = [sec for sec in cparser.sections() if sec.startswith('file')]
     for sec_name in file_sections:
-        sec = conf[sec_name]
-        file_config = Other()
-        file_config.dirname = sec.get('dirname', '/var/lib/pysqm')
-        file_config.format = sec.get('format')
-        file_config.interval = sec.getfloat('interval', 300.0)
-        file_config.insconf = photo_dev.static_conf()
-        file_config.location = loc_conf
+        logger.info('Creating file ouput')
+        sec = cparser[sec_name]
+        if sec.getboolean('enabled', True):
+            file_config = OtherConf()
+            file_config.dirname = sec.get('dirname', '/var/lib/pysqm')
+            file_config.format = sec.get('format')
+            file_config.interval = sec.getfloat('interval', 300.0)
+            file_config.insconf = photo_dev.static_conf()
+            file_config.location = loc_conf
 
-        q_w = queue.Queue()
-        ts = create_file_writer_workers(q_w, file_config)
-        q_cons.append(q_w)
-        j_threads.extend(ts)
+            q_w = queue.Queue()
+            ts = create_file_writer_workers(q_w, file_config)
+            q_cons.append(q_w)
+            j_threads.extend(ts)
+        else:
+            logger.info('file section %s disabled', sec_name)
 
     # reader queue
     q_reader = queue.Queue()
