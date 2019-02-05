@@ -10,7 +10,7 @@ setup(
     license='GPLv3',
     description='TESS photometer reading software',
     packages=['tesstractor'],
-    install_requires=['pytz', 'tzlocal', 'pyserial', 'paho-mqtt', 'attrs'],
+    install_requires=['pytz', 'tzlocal', 'pyserial', 'paho-mqtt', 'attrs>=17.4.0'],
     entry_points={
         'console_scripts': [
             'tesstractor = tesstractor.cli:main'
