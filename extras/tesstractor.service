@@ -1,5 +1,6 @@
 [Unit]
 Description=TESStractor reader
+Requires=network.target
 
 [Service]
 ExecStart=%h/.local/bin/tesstractor -c %h/config.ini
