@@ -30,5 +30,6 @@ setup(
         "Operating System :: OS Independent",
         "Topic :: Scientific/Engineering :: Astronomy",
     ],
-    long_description=open('README.md').read()
+    long_description=open('README.md').read(),
+    long_description_content_type='text/markdown'
 )
