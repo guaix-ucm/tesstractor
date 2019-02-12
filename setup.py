@@ -3,7 +3,7 @@ from setuptools import setup
 
 setup(
     name='tesstractor',
-    version='0.1dev0',
+    version='0.6.dev0',
     author='Sergio Pascual',
     author_email='sergiopr@fis.ucm.es',
     url='https://github.com/guaix-ucm/tesstractor',
@@ -24,7 +24,7 @@ setup(
         "Programming Language :: Python :: 3.7",
         "Programming Language :: Python :: Implementation :: CPython",
         'Development Status :: 3 - Alpha',
-        "Environment :: OtherConf Environment",
+        "Environment :: Console",
         "Intended Audience :: Science/Research",
         "License :: OSI Approved :: GNU General Public License (GPL)",
         "Operating System :: OS Independent",
