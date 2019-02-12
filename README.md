@@ -1,3 +1,6 @@
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.2563066.svg)](https://doi.org/10.5281/zenodo.2563066)
+[![Build Status](https://travis-ci.org/guaix-ucm/tesstractor.svg?branch=master)](https://travis-ci.org/guaix-ucm/tesstractor)
+
 # TESStractor #
 
 Tesstractor is a software designed to read data from
