@@ -10,19 +10,19 @@ setup(
     license='GPLv3',
     description='TESS photometer reading software',
     packages=['tesstractor'],
+    package_data={
+        'tesstractor': ['base.ini', 'IDA-*-template.tpl']
+    },
     install_requires=['pytz', 'tzlocal', 'pyserial', 'paho-mqtt', 'attrs>=17.4.0'],
     entry_points={
         'console_scripts': [
             'tesstractor = tesstractor.cli:main'
         ]
     },
-    zip_safe=False,
     classifiers=[
-        "Programming Language :: C",
-        "Programming Language :: Cython",
+        "Programming Language :: Python :: 3",
         "Programming Language :: Python :: 3.6",
         "Programming Language :: Python :: 3.7",
-        "Programming Language :: Python :: Implementation :: CPython",
         'Development Status :: 3 - Alpha',
         "Environment :: Console",
         "Intended Audience :: Science/Research",
