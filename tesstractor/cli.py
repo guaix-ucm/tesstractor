@@ -185,10 +185,6 @@ def create_file_writer_workers(q_worker, file_config):
 
 
 def main(args=None):
-    logging.basicConfig(level=logging.DEBUG)
-    logger = logging.getLogger(__name__)
-    logger.info('tesstractor, starting')
-
     # Register events and signal
     exit_event = threading.Event()
     send_event = threading.Event()
@@ -206,8 +202,17 @@ def main(args=None):
     parser.add_argument('--dirname')
     parser.add_argument('-c', '--config')
     parser.add_argument('-g', '--generate-config', action='store_true')
+    parser.add_argument("--log", default='INFO',
+                        choices=['DEBUG', 'INFO', 'WARNING', 'ERROR', 'CRTICAL', 'NOTSET']
+                        )
 
     pargs = parser.parse_args(args=args)
+
+    loglevel = getattr(logging, pargs.log.upper())
+
+    logging.basicConfig(level=loglevel)
+    logger = logging.getLogger(__name__)
+    logger.info('tesstractor, starting')
 
     if pargs.generate_config:
         # write the default config file
