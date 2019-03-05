@@ -1,1 +1,3 @@
 include LICENSE.txt
+include extras/tesstractor.service
+include extras/config.ini
