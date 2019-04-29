@@ -130,7 +130,7 @@ def gen_plot(ax, tval, magval, site, base_time):
     mins = mdates.MinuteLocator(byminute=[0, 30])
     hoursfmt = mdates.DateFormatter("%H", tz=site.timezone)
 
-    ax.plot(tval, magval)
+    ax.plot(tval, magval, '+')
     ax.set_ylabel('sky brightness (mag / arcsec^2)')
     # SUN
     plot_sun(ax, site, base_time)
@@ -176,28 +176,49 @@ def do_plots_on_dir(dirname):
             logger.debug('%s plot older than data, nothing to do', filep)
 
 
-def plot_file(filed_f, filep_f):
-    # b = astropy.table.Table.read(filed_f, format='ascii.basic', delimiter=';',
-    #                             names=['time_utc', 'time_local', 'temp', 'counts', 'freq', 'mag'],
-    #                             converters={'time_utc': [func1]})
-    b = astropy.table.Table.read(filed_f, format='ascii.basic', delimiter=';',
-                                 names=['time_utc', 'time_local', 'temp', 'sky_temp', 'freq', 'mag', 'zp'],
-                                 converters={'time_utc': [func1]})
+def do_plots_on_file(filename):
+    fname, ext = os.path.splitext(filename)
+    filep = fname + '.png'
+    plot_file(filename, filep)
 
-    # FIXME: this should come from the file itself
-    lat = 40.450941 * u.deg
-    lon = -3.726065 * u.deg
-    height = 658 * u.m
+
+def plot_file(filed_f, filep_f):
+
+    table_obj = astropy.table.Table.read(
+        filed_f, format='ascii.basic', delimiter=';',
+        names=['time_utc', 'time_local', 'temp', 'sky_temp', 'freq', 'mag', 'zp'],
+        converters={'time_utc': [func1]}
+    )
+
+    # earth location
+    table_obj.meta['lat'] = 40.450941 * u.deg
+    table_obj.meta['lon'] = -3.726065 * u.deg
+    table_obj.meta['height'] = 658 * u.m
+    # timezone
+    table_obj.meta['timezone'] = "Europe/Madrid"
+    fig = plot_table(table_obj)
+    fig.savefig(filep_f)
+
+
+def plot_table(tab):
+
+    figsize = (12,12)
+    min_mag = 12
+
+    lat = tab.meta['lat']
+    lon = tab.meta['lon']
+    height = tab.meta['height']
+    timezone = tab.meta['timezone']
     # lat = -80.450941 * u.deg
     location = EarthLocation(lat=lat, lon=lon, height=height)
-    site = astroplan.Observer(location=location, name='here', timezone="Europe/Madrid")
+    site = astroplan.Observer(location=location, name='here', timezone=timezone)
 
-    t1 = np.array([pytz.utc.localize(datetime.fromisoformat(value)) for value in b['time_utc']])
+    t1 = np.array([pytz.utc.localize(datetime.fromisoformat(value)) for value in tab['time_utc']])
     tval_local = np.array([tutc.astimezone(site.timezone) for tutc in t1])
-    magval_local = b['mag']
+    magval_local = tab['mag']
 
     # Filter mag values above 12
-    mask_5 = magval_local > 12
+    mask_5 = magval_local > min_mag
     tval_local = tval_local[mask_5]
     magval_local = magval_local[mask_5]
 
@@ -212,10 +233,9 @@ def plot_file(filed_f, filep_f):
     )
     ref_day = site.timezone.localize(ref_day)
     base_time = Time(ref_day.astimezone(pytz.utc))
-
-    fig, ax = plt.subplots()
+    fig, ax = plt.subplots(figsize=figsize)
     gen_plot(ax, tval_local, magval_local, site, base_time)
-    fig.savefig(filep_f)
+    return fig
 
 
 def main(args=None):
@@ -238,6 +258,7 @@ def main(args=None):
         do_plots_on_dir(pargs.path)
     else:
         logger.debug('path is file')
+        do_plots_on_file(pargs.path)
 
 
 if __name__ == '__main__':

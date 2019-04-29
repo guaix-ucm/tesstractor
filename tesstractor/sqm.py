@@ -105,19 +105,17 @@ class SQM(Device):
             raise ValueError('process_metadata')
 
     def process_data(self, match):
-        if match:
-            self.rx_readout = match.group()
-            result = {}
-            result['name'] = self.name
-            result['model'] = 'SQM'
-            result['cmd'] = match.group('cmd').decode('utf-8')
-            result['magnitude'] = float(match.group('magnitude'))
-            result['freq'] = int(match.group('freq'))
-            result['period'] = float(match.group('period'))
-            result['temp_ambient'] = float(match.group('temp_ambient'))
-            return result
-        else:
-            raise ValueError('process_data')
+        self.rx_readout = match.group()
+        result = {}
+        result['name'] = self.name
+        result['model'] = 'SQM'
+        result['cmd'] = match.group('cmd').decode('utf-8')
+        result['magnitude'] = float(match.group('magnitude'))
+        result['freq'] = int(match.group('freq'))
+        result['period'] = float(match.group('period'))
+        result['temp_ambient'] = float(match.group('temp_ambient'))
+        return result
+
 
     def process_calibration(self, match):
         if match:
@@ -217,6 +215,13 @@ class SQM(Device):
             if match:
                 pmsg = self.process_data(match)
                 logger.debug('data is %s', pmsg)
+
+                if pmsg['magnitude'] < 0:
+                    logger.warning('negative measured magnitude, try again')
+                    this_try += 1
+                    time.sleep(self.cmd_wait)
+                    continue
+
                 return pmsg
             else:
                 logger.warning('malformed data, try again')
@@ -227,7 +232,7 @@ class SQM(Device):
                 time.sleep(self.cmd_wait)
 
         logger.error('reading data after %d tries', tries)
-        raise ValueError('read_data')
+        return None
 
     def pass_command(self, cmd):
         pass
@@ -305,7 +310,9 @@ class SQMTest(SQM):
 
 def filter_buffer(payloads):
     mags = [p['magnitude'] for p in payloads]
+    _logger.debug('filter values: %s', mags)
     avg_mag = average_mags(mags)
+    _logger.debug('result is: %s', avg_mag)
     # return avg payload
     avg_payload = dict(payloads[0])
     avg_payload['magnitude'] = avg_mag

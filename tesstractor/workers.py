@@ -35,8 +35,8 @@ def read_photometer_timed(device, q, exit_event):
     seq = 0
 
     buffer = []
-    nsamples = 10
-    exit_check_timeout = 0
+    nsamples = 5
+    exit_check_timeout = 5
     # print('(1)timed_reader, reading every ', timeout, 's')
     # initialice connection. read metadata and calibration
 
@@ -66,6 +66,7 @@ def read_photometer_timed(device, q, exit_event):
         # q.put(None)
         # exit_event.set()
         do_exit = exit_event.wait(timeout=exit_check_timeout)
+        tries = 3
 
         while not do_exit:
             now = datetime.datetime.utcnow()
@@ -73,7 +74,7 @@ def read_photometer_timed(device, q, exit_event):
             #now_utc = pytz.utc.localize(now)
             #now_local = now_utc.astimezone(local_tz)
 
-            msg = device.read_data()
+            msg = device.read_data(tries=tries)
             if msg is None:
                 continue
 
@@ -82,15 +83,19 @@ def read_photometer_timed(device, q, exit_event):
             payload = dict(msg)
             payload['tstamp'] = now
             payload['localtz'] = local_tz
-
+            _logger.debug('payload is {}'.format(payload))
             buffer.append(payload)
+            _logger.debug('nsamples is {}'.format(len(buffer)))
             if len(buffer) >= nsamples:
+                _logger.debug('averaging {} samples'.format(len(buffer)))
                 # print('(R) enough samples', len(buffer))
                 # do average
                 avg = device.filter_buffer(buffer)
                 avg['seq'] = seq
                 # reset buffer
                 buffer = []
+                _logger.debug('buffer avg is {}'.format(avg))
+                _logger.debug('reset buffer {}'.format(buffer))
                 q.put(avg)
                 seq += 1
             do_exit = exit_event.wait(timeout=exit_check_timeout)
