@@ -13,7 +13,8 @@ setup(
     package_data={
         'tesstractor': ['base.ini', 'IDA-*-template.tpl']
     },
-    install_requires=['pytz', 'tzlocal', 'pyserial', 'paho-mqtt', 'attrs>=17.4.0'],
+    install_requires=['pytz', 'tzlocal', 'pyserial', 'paho-mqtt', 'attrs>=17.4.0',
+                      'matplotlib', 'astroplan', 'astropy'],
     entry_points={
         'console_scripts': [
             'tesstractor = tesstractor.cli:main',
