@@ -3,3 +3,7 @@ tzlocal
 pyserial
 attrs>=17.4.0
 paho-mqtt
+numpy
+astropy
+astroplan
+matplotlib
