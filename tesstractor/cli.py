@@ -187,7 +187,10 @@ def create_file_writer_workers(q_worker, file_config):
 def main(args=None):
     # Register events and signal
     exit_event = threading.Event()
+    error_event = threading.Event()
     send_event = threading.Event()
+
+    exit_code = 0
 
     send_event.clear()
 
@@ -316,7 +319,7 @@ def main(args=None):
     reader = threading.Thread(
         target=read_photometer_timed,
         name='photo_reader_{}'.format(photo_dev.name),
-        args=(photo_dev, q_reader, exit_event)
+        args=(photo_dev, q_reader, exit_event, error_event)
     )
     reader.start()
     all_readers.append(reader)
@@ -334,6 +337,10 @@ def main(args=None):
             logger.debug('cancel timer {}'.format(t.name))
             t.cancel()
 
+    if error_event.is_set():
+        exit_code = 1
+
+    sys.exit(exit_code)
 
 if __name__ == '__main__':
     main()

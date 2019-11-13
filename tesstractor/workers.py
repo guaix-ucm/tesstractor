@@ -29,7 +29,7 @@ filter_buffer_map = {
 
 _logger = logging.getLogger(__name__)
 
-def read_photometer_timed(device, q, exit_event):
+def read_photometer_timed(device, q, exit_event, error_event):
     thisth = threading.current_thread()
     _logger.info('starting {} thread'.format(thisth.name))
     seq = 0
@@ -99,8 +99,9 @@ def read_photometer_timed(device, q, exit_event):
                 q.put(avg)
                 seq += 1
             do_exit = exit_event.wait(timeout=exit_check_timeout)
-    # except serial.serialutil.SerialException:
-    #
+    except Exception as ex:
+        _logger.debug('exception happend %s', ex)
+        error_event.set()
     finally:
         _logger.debug('end read thread')
         _logger.debug('signalling producers to end')
