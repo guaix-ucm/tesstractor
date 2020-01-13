@@ -25,6 +25,9 @@ import astropy.table
 import astropy.units as u
 import astroplan
 
+# Import IDA format reader
+import tesstractor.reader
+
 
 def plot_sun(ax, site, base_time):
     # SUN
@@ -190,12 +193,9 @@ def plot_file(filed_f, filep_f):
         converters={'time_utc': [func1]}
     )
 
-    # earth location
-    table_obj.meta['lat'] = 40.450941 * u.deg
-    table_obj.meta['lon'] = -3.726065 * u.deg
-    table_obj.meta['height'] = 658 * u.m
-    # timezone
-    table_obj.meta['timezone'] = "Europe/Madrid"
+    table_obj = astropy.table.Table.read(
+        filed_f, format='ascii.IDA')
+
     fig = plot_table(table_obj)
     fig.savefig(filep_f)
 
