@@ -46,7 +46,7 @@ def read_photometer_timed(device, q, exit_event, error_event):
         # Read calibration
         # device.read_calibration()
 
-        mac = device.serial_number
+        mac = str(device.serial_number)
         now = datetime.datetime.utcnow()
         local_tz = tzlocal.get_localzone()
 
