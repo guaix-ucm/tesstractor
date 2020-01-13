@@ -13,6 +13,8 @@ import time
 import re
 import math
 
+import numpy
+
 from .device import Device, PhotometerConf
 
 
@@ -310,8 +312,8 @@ class SQMTest(SQM):
 
 def filter_buffer(payloads):
     mags = [p['magnitude'] for p in payloads]
-    _logger.debug('filter values: %s', mags)
-    avg_mag = average_mags(mags)
+    _logger.debug('filter values (median): %s', mags)
+    avg_mag = median_mags(mags)
     _logger.debug('result is: %s', avg_mag)
     # return avg payload
     avg_payload = dict(payloads[0])
@@ -327,3 +329,13 @@ def average_mags(mags):
     avg_mag = min_mag - 2.5 * math.log10(avg_flux)
     # return avg payload
     return avg_mag
+
+
+def median_mags(mags):
+    # to avoid overflows reference to the brightest mag
+    min_mag = min(mags)
+    fluxes = [10**(-0.4 * (m - min_mag)) for m in mags]
+    med_flux = numpy.median(fluxes)
+    med_mag = min_mag - 2.5 * math.log10(med_flux)
+    # return avg payload
+    return med_mag
