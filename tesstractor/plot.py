@@ -28,6 +28,12 @@ import astroplan
 # Import IDA format reader
 import tesstractor.reader
 
+# Style for saving into PNG
+my_style1 = {
+   "figure.figsize": (9, 7),
+    "savefig.dpi": 200,
+    "axes.labelsize": 14
+}
 
 def plot_sun(ax, site, base_time):
     # SUN
@@ -90,13 +96,13 @@ def plot_sun(ax, site, base_time):
             ax.axvline(sun_m_dt, color='r', ls='--', lw=2, alpha=0.5, clip_on=True)
     else:
         if there_is_day:
-            print('all day')
+            print('The sun is over the horizon all day')
             rect = mpatches.Rectangle(
                 (0, 0), width=1, height=1,
                 transform=ax.transAxes, color='blue', alpha=0.1)
             ax.add_patch(rect)
         else:
-            print('all night')
+            print('The sun is under the horizon all night')
     # Reset
     ax.set_xlim((tmin, tmax))
 
@@ -127,13 +133,27 @@ def plot_moon(ax, site, base_time):
     ax.plot(ctimes_dt, moon_altaz.alt, ls='-.', lw=1, color='black')
 
 
-def gen_plot(ax, tval, magval, site, base_time):
+def gen_plot(ax, tval, magval, site, ref_day, meta):
 
     hours = mdates.HourLocator(interval=2)
     mins = mdates.MinuteLocator(byminute=[0, 30])
     hoursfmt = mdates.DateFormatter("%H", tz=site.timezone)
-
-    ax.plot(tval, magval, '+')
+    next_day = ref_day + timedelta(days=1)
+    base_time = Time(ref_day.astimezone(pytz.utc))
+    if len(tval) > 0:
+        ax.plot(tval, magval, '+')
+    else:
+        t1 = ref_day
+        t2 = ref_day + timedelta(seconds=7200)
+        ax.set_xlim(t1, t2)
+    utco = ref_day.strftime("%z")
+    day1 = ref_day.strftime("%Y-%m-%d")
+    day2 = next_day.strftime("%Y-%m-%d")
+    title_label1 = 'device: {device_type} {instrument_id}'.format(**meta)
+    title_label2 = 'date: {}/{}'.format(day1, day2)
+    title_label = '{:^15}   {:^15}'.format(title_label1, title_label2)
+    ax.set_title(title_label)
+    ax.set_xlabel('Local time (UTC {})'.format(utco))
     ax.set_ylabel('sky brightness (mag / arcsec^2)')
     # SUN
     plot_sun(ax, site, base_time)
@@ -148,10 +168,6 @@ def gen_plot(ax, tval, magval, site, base_time):
     ax.format_xdata = mdates.DateFormatter("%H:%M:%S", tz=site.timezone)
 
 
-def func1(value):
-    return datetime.strptime(value, "%Y-%b-%d %H:%M:%s")
-
-
 def do_plots_on_dir(dirname):
     logger = logging.getLogger(__name__)
 
@@ -160,7 +176,7 @@ def do_plots_on_dir(dirname):
         if f.endswith('.dat'):
             data_files.append(f)
 
-    for filed in data_files:
+    for filed in sorted(data_files):
         fname, ext = os.path.splitext(filed)
         filep = fname + '.png'
         filed_f = os.path.join(dirname, filed)
@@ -186,32 +202,24 @@ def do_plots_on_file(filename):
 
 
 def plot_file(filed_f, filep_f):
-
-    table_obj = astropy.table.Table.read(
-        filed_f, format='ascii.basic', delimiter=';',
-        names=['time_utc', 'time_local', 'temp', 'sky_temp', 'freq', 'mag', 'zp'],
-        converters={'time_utc': [func1]}
-    )
-
     table_obj = astropy.table.Table.read(
         filed_f, format='ascii.IDA')
 
-    fig = plot_table(table_obj)
-    fig.savefig(filep_f)
+    with plt.style.context(my_style1):
+        fig = plot_table(table_obj)
+        fig.savefig(filep_f)
+        plt.close(fig)
 
 
 def plot_table(tab):
-
-    figsize = (12,12)
     min_mag = 12
 
     lat = tab.meta['lat']
     lon = tab.meta['lon']
     height = tab.meta['height']
     timezone = tab.meta['timezone']
-    # lat = -80.450941 * u.deg
     location = EarthLocation(lat=lat, lon=lon, height=height)
-    site = astroplan.Observer(location=location, name='here', timezone=timezone)
+    site = astroplan.Observer(location=location, name=tab.meta['location_name'], timezone=timezone)
 
     t1 = np.array([pytz.utc.localize(datetime.fromisoformat(value)) for value in tab['time_utc']])
     tval_local = np.array([tutc.astimezone(site.timezone) for tutc in t1])
@@ -219,10 +227,17 @@ def plot_table(tab):
 
     # Filter mag values above 12
     mask_5 = magval_local > min_mag
-    tval_local = tval_local[mask_5]
+    tval_local_f = tval_local[mask_5]
     magval_local = magval_local[mask_5]
 
-    ref_time = tval_local[0]
+    if len(tval_local_f) > 0:
+        ref_time = tval_local_f[0]
+    elif len(tval_local) > 0:
+        ref_time = tval_local[0]
+    else:
+        # Empty file
+        return None
+
     ref_day = datetime(
         year=ref_time.year,
         month=ref_time.month,
@@ -232,9 +247,9 @@ def plot_table(tab):
         second=0
     )
     ref_day = site.timezone.localize(ref_day)
-    base_time = Time(ref_day.astimezone(pytz.utc))
-    fig, ax = plt.subplots(figsize=figsize)
-    gen_plot(ax, tval_local, magval_local, site, base_time)
+    fig = plt.figure()
+    ax = fig.add_subplot()
+    gen_plot(ax, tval_local_f, magval_local, site, ref_day, tab.meta)
     return fig
 
 
