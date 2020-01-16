@@ -48,6 +48,7 @@ _header_entries = {
     'local_timezone': meta_as_type('timezone', remove_quotes),
     'instrument_id': meta_as_type('instrument_id', str),
     'data_supplier': meta_as_type('data_supplier', str),
+    'location_name': meta_as_type('location_name', str),
     'position': position_converter,
 }
 
