@@ -1,7 +1,7 @@
 #
-# Copyright 2018-2019 Universidad Complutense de Madrid
+# Copyright 2018-2022 Universidad Complutense de Madrid
 #
-# This file is part of tessreader
+# This file is part of tesstractor
 #
 # SPDX-License-Identifier: GPL-3.0+
 # License-Filename: LICENSE.txt
@@ -10,33 +10,34 @@
 import datetime
 import threading
 import logging
-
-import tzlocal
+import typing
+import math
 import queue
 
+import tzlocal
+import numpy
 
-# FIXME: this is for filter buffer2
-# this can be done better
-from tesstractor.tess import Tess
-from tesstractor.sqm import SQM
-
-
-filter_buffer_map = {
-    'TESS': Tess.filter_buffer2,
-    'SQM': SQM.filter_buffer2
-}
+from tesstractor.sqm import Device
 
 
 _logger = logging.getLogger(__name__)
 
-def read_photometer_timed(device, q, exit_event, error_event):
+
+def read_photometer_timed(
+        device: Device,
+        output_q: queue.Queue,
+        readerconf,
+        exit_event: threading.Event,
+        error_event: threading.Event
+):
     thisth = threading.current_thread()
     _logger.info('starting {} thread'.format(thisth.name))
     seq = 0
 
-    buffer = []
-    nsamples = 5
-    exit_check_timeout = 5
+    internal_buffer = []
+
+    nsamples = readerconf.get('nsamples', 5)
+    exit_check_timeout = 1
     # print('(1)timed_reader, reading every ', timeout, 's')
     # initialice connection. read metadata and calibration
 
@@ -48,7 +49,7 @@ def read_photometer_timed(device, q, exit_event, error_event):
 
         mac = str(device.serial_number)
         now = datetime.datetime.utcnow()
-        local_tz = tzlocal.get_localzone()
+        local_tz = readerconf.get('tz', tzlocal.get_localzone())
 
         payload_init = dict(
             name=device.name,
@@ -61,18 +62,21 @@ def read_photometer_timed(device, q, exit_event, error_event):
             localtz=local_tz
         )
 
-        q.put(payload_init)
+        output_q.put(payload_init)
         # exit after this
         # q.put(None)
         # exit_event.set()
-        do_exit = exit_event.wait(timeout=exit_check_timeout)
-        tries = 3
 
+        # Check if exit_event is set. If it is not set,
+        # wait a little (exit_check_timeout) and continue
+        do_exit = exit_event.wait(timeout=exit_check_timeout)
+
+        tries = 3
         while not do_exit:
-            now = datetime.datetime.utcnow()
-            local_tz = tzlocal.get_localzone()
-            #now_utc = pytz.utc.localize(now)
-            #now_local = now_utc.astimezone(local_tz)
+            # now = datetime.datetime.utcnow()
+            # local_tz = tzlocal.get_localzone()
+            # now_utc = pytz.utc.localize(now)
+            # now_local = now_utc.astimezone(local_tz)
 
             msg = device.read_data(tries=tries)
             if msg is None:
@@ -81,41 +85,83 @@ def read_photometer_timed(device, q, exit_event, error_event):
             # print('(R)timed_reader loop', msg)
             # FIXME: this could be inside read_data
             payload = dict(msg)
-            payload['tstamp'] = now
             payload['localtz'] = local_tz
-            _logger.debug('payload is {}'.format(payload))
-            buffer.append(payload)
-            _logger.debug('nsamples is {}'.format(len(buffer)))
-            if len(buffer) >= nsamples:
-                _logger.debug('averaging {} samples'.format(len(buffer)))
+            _logger.debug(f'payload is {payload}')
+            internal_buffer.append(payload)
+            _logger.debug(f'nsamples is {len(internal_buffer)}')
+
+            # When we have enough measurements, we collapse
+
+            if len(internal_buffer) >= nsamples:
+                _logger.debug('averaging {} samples'.format(len(internal_buffer)))
                 # print('(R) enough samples', len(buffer))
                 # do average
-                avg = device.filter_buffer(buffer)
-                avg['seq'] = seq
+                res = avg_device_buffer(internal_buffer)
+                res['seq'] = seq
                 # reset buffer
-                buffer = []
-                _logger.debug('buffer avg is {}'.format(avg))
-                _logger.debug('reset buffer {}'.format(buffer))
-                q.put(avg)
+                internal_buffer = []
+                _logger.debug('buffer avg is {}'.format(res))
+                _logger.debug('reset buffer {}'.format(internal_buffer))
+                # Send averaged measurement for further work
+                output_q.put(res)
                 seq += 1
+            # Check if exit_event is set. If it is not set,
+            # wait a little (exit_check_timeout) and continue
             do_exit = exit_event.wait(timeout=exit_check_timeout)
     except Exception as ex:
-        _logger.debug('exception happend %s', ex)
+        _logger.debug('exception happened %s', ex)
         error_event.set()
     finally:
         _logger.debug('end read thread')
         _logger.debug('signalling producers to end')
         exit_event.set()
         _logger.debug('signalling consumers to end')
-        q.put(None)
+        output_q.put(None)
 
 
-def splitter(q, qs):
+def avg_device_buffer(payloads):
+    """Average n measurements"""
+    npayloads = len(payloads)
+    result = dict(payloads[0])
+
+    # we have to average
+    # tstamp and freq_sensor
+    # magnitude corresponds to the mag of the average freq
+    zero_point = result['zero_point']
+
+    vals = [p['freq_sensor'] for p in payloads]
+    # TODO: analyze if there are values <= 0, extreme values, etc.
+    vals_0 = list(filter(lambda x: x > 0, vals))
+    if len(vals_0) != len(vals):
+        print("WARNING, some measurements have freq <= 0")
+
+    if vals_0:
+        # Computing median
+        result['freq_sensor'] = numpy.median(vals_0)
+        result['magnitude'] = zero_point - 2.5 * math.log10(result['freq_sensor'])
+    else:
+        result['freq_sensor'] = 0
+        result['magnitude'] = -99
+
+    # These two are averages
+    for key in ['temp_ambient', 'temp_sky']:
+        if key in result:
+            result[key] = numpy.mean([p[key] for p in payloads])
+
+    # Time is average of times
+    ts0 = result['tstamp']
+    ts = [(p['tstamp'] - ts0) for p in payloads]
+    result['tstamp'] = ts0 + sum(ts, datetime.timedelta(0)) / npayloads
+    return result
+
+
+def splitter(inputq: queue.Queue, qs: typing.Sequence[queue.Queue]):
+    """Reads the input queue and sends the values to all the queues"""
     thisth = threading.current_thread()
     _logger.debug('starting {} thread'.format(thisth.name))
     while True:
-        payload = q.get()
-        q.task_done()
+        payload = inputq.get()
+        inputq.task_done()
         for wq in qs:
             # Sending to all tasks...
             wq.put(payload)
@@ -124,30 +170,14 @@ def splitter(q, qs):
             break
 
 
-def simple_consumer(q, other):
-    thisth = threading.current_thread()
-    _logger.debug('starting simple_consumer thread, %s', thisth.name)
-    while True:
-        payload = q.get()
-        if payload:
-            if payload['cmd'] == 'id':
-                print('(C)', thisth.name, 'register options', payload)
-                pass
-            elif payload['cmd'] == 'r':
-                print('(C)', thisth.name, 'data', payload)
-                pass
-            else:
-                print('(=)', thisth.name, 'other', payload)
-                pass
-            q.task_done()
-        else:
-            _logger.debug('end %s thread', thisth.name)
-            break
-
-
 def simple_buffer(q_in, q_out, q_buffer, other):
+    """Separates payload per command
+
+    If cmd is 'r', goes to q_buffer
+    If cmd is 'id', it goes q_to out
+    """
     thisth = threading.current_thread()
-    _logger.debug('starting filter buffer thread, %s', thisth.name)
+    _logger.debug(f'starting filter buffer thread, {thisth.name}')
     while True:
         payload = q_in.get()
         if payload:
@@ -156,26 +186,30 @@ def simple_buffer(q_in, q_out, q_buffer, other):
             elif payload['cmd'] == 'r':
                 q_buffer.put(payload)
             else:
-                _logger.warning('unknown cmd, %s', payload)
+                _logger.warning(f'unknown cmd, {payload}')
             q_in.task_done()
         else:
-            _logger.debug('end %s thread', thisth.name)
+            # If payload is None is a signal to exit
+            # put None in all queues and exit
             q_out.put(None)
             q_buffer.put(None)
+            _logger.debug(f'end {thisth.name} thread')
             break
 
 
-def timed_task(q_in1, q_out, other):
+def periodic_avg_task(q_in1: queue.Queue, q_out: queue.Queue, other):
+    """Average the buffer periodically"""
 
     thisth = threading.current_thread()
+    # thisth is a Timer, it has interval
     interval = thisth.interval
 
-    _logger.debug('wakeup timer thread, %s', thisth.name)
+    _logger.debug(f'wakeup timer thread, {thisth.name}')
     # other.set()
 
     # copy queue in buffer
     buffer = []
-    _logger.debug('copy buffer')
+    _logger.debug('fill buffer, empty input queue')
     try:
         while True:
             p = q_in1.get_nowait()
@@ -187,17 +221,17 @@ def timed_task(q_in1, q_out, other):
     except queue.Empty:
         pass
 
-    _logger.debug('process buffer, len={}'.format(len(buffer)))
+    _logger.debug(f'process buffer, len={len(buffer)}')
     if buffer:
-        fst = buffer[0]
-        model = fst['model']
-        filter_buffer_func = filter_buffer_map[model]
-        avg = filter_buffer_func(buffer)
-        q_out.put(avg)
+        # Queue processed value
+        result = avg_device_buffer(buffer)
+        # Send result to output queue
+        q_out.put(result)
     else:
         pass
 
-    _logger.debug('launch new timer thread, %s', thisth.name)
-    t = threading.Timer(interval, timed_task, args=(q_in1, q_out, other))
+    # After doing the work, start a new timed thread
+    _logger.debug(f'launch new timer thread, {thisth.name}')
+    t = threading.Timer(interval, periodic_avg_task, args=(q_in1, q_out, other))
     t.name = thisth.name
     t.start()

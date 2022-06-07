@@ -1,5 +1,5 @@
 #
-# Copyright 2018-2019 Universidad Complutense de Madrid
+# Copyright 2018-2022 Universidad Complutense de Madrid
 #
 # This file is part of tesstractor
 #
@@ -13,6 +13,9 @@ import time
 import re
 import math
 import datetime
+import json
+import typing
+
 
 from .device import Device, PhotometerConf
 
@@ -40,17 +43,15 @@ class TESSConf(PhotometerConf):
 
 
 class Tess(Device):
+    """Generic TESS device"""
     def __init__(self, name="unknown", model='unknown'):
-        super().__init__()
+        super().__init__(name, model)
         # Get Photometer identification codes
-
-        self.name = name
-        self.model = model
         self.protocol_number = 0
         self.model_number = 0
         self.feature_number = 0
         self.serial_number = self.name
-        self.calibration = 20.5
+
         self.mac = "01:23:45:67:89:AB"
         self.cmd_wait = 0
         self.counts = 1
@@ -74,10 +75,10 @@ class Tess(Device):
         else:
             raise ValueError('process_metadata')
 
-    def process_data(self, match):
+    def process_msg(self, match):
         re_m = match.groupdict()
         # temps
-        result = {}
+        result = dict()
         result['cmd'] = 'r'
         result['freq'] = 0.0
         result['magnitude'] = 99.0
@@ -120,7 +121,6 @@ class Tess(Device):
             if re_m[key] is not None:
                 result[key] = int(re_m[key])
         return result
-
 
     def check_capabilities(self, match):
 
@@ -197,7 +197,6 @@ class Tess(Device):
         result['tstamp'] = ts0 + sum(ts, datetime.timedelta(0)) / npayloads
         return result
 
-
     def process_calibration(self, match):
         if match:
             return {'cmd': 'c', 'calibration': self.calibration}
@@ -242,7 +241,6 @@ class Tess(Device):
         logger.error(msg)
         raise ValueError(msg)
 
-
     def read_calibration(self, tries=1):
         """Read the calibration parameters"""
 
@@ -250,7 +248,7 @@ class Tess(Device):
         return pmsg
 
     def read_data(self, tries=1):
-        """Read the calibration parameters"""
+        """Read measurements"""
 
         logger = logging.getLogger(__name__)
 
@@ -260,13 +258,13 @@ class Tess(Device):
             logger.debug("msg is %s", msg)
             match = MEASURE_RE.match(msg)
             if match:
-                #logger.debug('process data')
-                pmsg = self.process_data(match)
+                logger.debug('process data')
+                pmsg = self.process_msg(match)
                 logger.debug('data is %s', pmsg)
                 return pmsg
             else:
                 logger.warning('malformed data, ignoring %s', msg)
-                # logger.debug('data is %s', msg)
+                logger.debug('data is %s', msg)
                 this_try += 1
                 time.sleep(self.cmd_wait)
                 self.reset_device()
@@ -316,20 +314,114 @@ class TessR(Tess):
         self.serial.write(cmd)
 
 
-def filter_buffer(payloads):
-    mags = [p['magnitude'] for p in payloads]
-    avg_mag = average_mags(mags)
-    # return avg payload
-    avg_payload = dict(payloads[0])
-    avg_payload['magnitude'] = avg_mag
-    return avg_payload
+class TessV2(Tess):
+    """TESS serial V2
+
+    The output format of this photometer mixes text with json with this fields:
+
+    {
+    "udp":83471,  output number , ignoring
+    "rev":2,
+    "name":"stars605",
+    "freq":13.38,
+    "mag":17.52,
+    "tamb":30.39,
+    "tsky":29.23,
+    "wdBm":-50,  wifi power, ignoring
+    "ain":448, analog input, ignoring
+    "ZP":20.34  zero_point
+    }
 
 
-def average_mags(mags):
-    # to avoid overflows reference to the brightest mag
-    min_mag = min(mags)
-    fluxes = [10**(-0.4 * (m - min_mag)) for m in mags]
-    avg_flux = sum(fluxes) / len(fluxes)
-    avg_mag = min_mag - 2.5 * math.log10(avg_flux)
-    # return avg payload
-    return avg_mag
+    """
+    def __init__(self, conn, name="tess", sleep_time=1, tries=10):
+        super().__init__(name=name, model='TESSv2')
+        self.serial = conn
+        # Clearing buffer
+        self.read_msg()
+
+    def close_connection(self):
+        """End photometer connection"""
+        _logger.debug('close connection')
+        self.serial.close()
+
+    def read_msg(self):
+        """Read messages from the photometer"""
+        msg = self.serial.readline()
+        return msg
+
+    def pass_command(self, cmd):
+        # We can't pass commands
+        pass
+
+    def read_metadata(self, tries=1):
+        # We can't ask the photometer its values
+        pass
+
+    def read_data(self, tries=1):
+        """Read measurements"""
+
+        # This TESS mixes messages with actual data
+        # and sometimes expends a lot of time
+        # complaining about WIFI
+        # I'm going to ignore 'tries'
+        # And I will return None instead
+
+        # Tries should go probably to read_msg
+        # to see if the device returns actual values
+        # Here we are waiting until we get actual valid data
+        logger = logging.getLogger(__name__)
+        this_try = 0
+        while this_try < tries:
+            msg = self.read_msg()
+            #logger.debug("msg is %s", msg)
+            try:
+                res = json.loads(msg)
+            except ValueError:
+                res = None
+            # Sometimes it returns numbers, not dicts
+            if res and isinstance(res, dict):
+                logger.debug('process message')
+                pmsg = self.process_msg(res)
+                logger.debug(f'processed data is {pmsg}')
+                return pmsg
+            else:
+                # We expect several non-json messages between correct msgs
+                #logger.debug('ignoring %s', msg)
+                #this_try += 1
+                return None
+
+        msg = f'unable to read data after {tries} tries'
+        logger.error(msg)
+        raise ValueError(msg)
+
+    def process_msg(self, res: typing.Mapping) -> dict:
+        """Convert the message from the photometer to unified format"""
+        # temps
+        # Convert whatever we read from the photometer
+        # to a unified format
+        payload = dict()
+        payload['model'] = 'TESSv2'
+        payload['cmd'] = 'r'
+        payload['protocol_revision'] = 2
+        payload['zero_point'] = self.calibration
+
+        msg_zp = res.get('ZP')
+        if self.calibration != msg_zp:
+            print('RUNTIME WARNING', self.calibration, msg_zp)
+
+        msg_rev = res.get('rev')
+        if 2 != msg_rev:
+            print('RUNTIME WARNING', 2, msg_rev)
+
+        # Actual lectures from the photometer
+        payload['freq_sensor'] = res.get('freq') # Actual measurement, in Hz
+        payload['magnitude'] = res.get('mag')
+        payload['temp_ambient'] = res.get('tamb')
+        payload['temp_sky'] = res.get('tsky')
+
+        # Add time information
+        # Complete the payload with tstamp and TZ
+        now = datetime.datetime.utcnow()
+        payload['tstamp'] = now
+        return payload

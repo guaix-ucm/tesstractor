@@ -1,7 +1,7 @@
 #
-# Copyright 2018-2019 Universidad Complutense de Madrid
+# Copyright 2018-2022 Universidad Complutense de Madrid
 #
-# This file is part of tessreader
+# This file is part of tesstractor
 #
 # SPDX-License-Identifier: GPL-3.0+
 # License-Filename: LICENSE.txt
@@ -10,6 +10,7 @@
 import datetime
 import logging
 import json
+import queue
 
 import paho.mqtt.client as mqtt
 
@@ -19,28 +20,8 @@ _HALF_S = datetime.timedelta(seconds=0.5)
 _logger = logging.getLogger(__name__)
 
 
-def consumer_mqtt(q, other):
-    _logger.info('starting MQTT consumer')
-    try:
-        other.connect()
-        other.client.loop_start()
-
-        while True:
-            payload = q.get()
-            if payload:
-                _logger.debug('got payload %s', payload)
-                res = other.do_work1(payload)
-                _logger.debug('server says %s', res)
-                q.task_done()
-            else:
-                _logger.info('end MQTT consumer thread')
-                other.client.loop_stop()
-                break
-    except IOError:
-        _logger.exception('connecting to MQTT server')
-
-
 class MqttConsumer:
+    """Handle mqtt connections"""
     def __init__(self, config):
         self.client = mqtt.Client()
         self.config = config
@@ -62,7 +43,8 @@ class MqttConsumer:
             60
         )
 
-    def do_work1(self, msg):
+    def do_work(self, msg):
+        """Format payload and send it to server"""
         if msg['cmd'] == 'id':
             _logger.debug('enter register')
             # reset sequence number
@@ -104,4 +86,25 @@ class MqttConsumer:
             _logger.debug('sending data %s', spayload)
             return response
         else:
-            raise ValueError('MQTT.do_work1, msg cmd is unknown')
+            raise ValueError('MQTT.do_work, msg cmd is unknown')
+
+
+def consumer_mqtt(q: queue.Queue, other: MqttConsumer):
+    _logger.info('starting MQTT consumer')
+    try:
+        other.connect()
+        other.client.loop_start()
+
+        while True:
+            payload = q.get()
+            if payload:
+                _logger.debug('got payload %s', payload)
+                res = other.do_work(payload)
+                _logger.debug('server says %s', res)
+                q.task_done()
+            else:
+                _logger.info('end MQTT consumer thread')
+                other.client.loop_stop()
+                break
+    except IOError:
+        _logger.exception('connecting to MQTT server')

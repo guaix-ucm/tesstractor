@@ -1,5 +1,5 @@
 #
-# Copyright 2018-2019 Universidad Complutense de Madrid
+# Copyright 2018-2022 Universidad Complutense de Madrid
 #
 # This file is part of tesstractor
 #
@@ -7,4 +7,4 @@
 # License-Filename: LICENSE.txt
 #
 
-__version__ = '0.6.dev0'
+__version__ = '0.6.dev1'

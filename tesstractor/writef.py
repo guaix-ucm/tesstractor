@@ -1,7 +1,7 @@
 #
-# Copyright 2018-2019 Universidad Complutense de Madrid
+# Copyright 2018-2022 Universidad Complutense de Madrid
 #
-# This file is part of tessreader
+# This file is part of tesstractor
 #
 # SPDX-License-Identifier: GPL-3.0+
 # License-Filename: LICENSE.txt
@@ -13,6 +13,7 @@ import pkgutil
 import datetime
 import glob
 import os.path
+import queue
 
 import pytz
 
@@ -24,10 +25,12 @@ _logger = logging.getLogger(__name__)
 IDA_TMPL = {
     'TESS': 'IDA-TESS-template.tpl',
     'TESS-R': 'IDA-TESS-template.tpl',
+    'TESSv2': 'IDA-TESS-template.tpl',
     'SQM': 'IDA-SQM-template.tpl',
     'SQM-LU': 'IDA-SQM-template.tpl',
     'SQM-TEST': 'IDA-SQM-template.tpl'
 }
+
 
 class TimeInterval:
     def __init__(self, min_val, max_val):
@@ -124,14 +127,17 @@ def startup(time_interval, name, dirname):
     return create, filename
 
 
-def consumer_write_file(q, other):
+def consumer_write_file(intput_q: queue.Queue, config):
+    """Thread to manage file writing"""
     _logger.info('starting file writer consumer')
 
+    # Open the correct file, create a new one if
+    # it doesn't exist
     ref_dt = datetime.datetime.now()
     _logger.debug('current local time, %s', ref_dt)
     # directory with logs
 
-    _logger.debug('directory with previous files, %s', other.dirname)
+    _logger.debug('directory with previous files, %s', config.dirname)
 
     _logger.debug('interval of valid logs')
     rot = TimedDailyRotator(
@@ -143,30 +149,36 @@ def consumer_write_file(q, other):
     next_change = valid_inter.max_val
     _logger.debug('from %s upto %s', last_change, next_change)
 
-    insconf = other.insconf
+    insconf = config.devconf
 
-    create, valid_fname = startup(valid_inter, insconf.name, other.dirname)
+    create, valid_fname = startup(valid_inter, insconf.name, config.dirname)
 
     if create:
         valid_fname = calc_filename(ref_dt, name=insconf.name)
         _logger.debug('valid file not found')
         _logger.debug('create %s', valid_fname)
         init_file(
-            os.path.join(other.dirname, valid_fname),
+            os.path.join(config.dirname, valid_fname),
             insconf,
-            other.location
+            config.location
         )
     else:
         _logger.debug('valid file is %s', valid_fname)
 
     while True:
         _logger.debug('enter thread loop')
-        payload = q.get()
+        payload = intput_q.get()
         if payload:
-            _logger.debug('got (w) payload %s', payload)
-            # write_to_file_3(payload, None)
+            # We are not going to write this to file anyway
+            if payload['cmd'] == 'id':
+                continue
+
+            _logger.debug(f'got (w) payload {payload}')
+            # Add local time to payload
             payload = update_p(payload)
-            payload['zero_point'] = other.insconf.zero_point
+            #
+            # Verify the file is correct before writing
+            # if not, create a new one
             now_local = payload['tstamp_local']
             now_local_n = now_local.replace(tzinfo=None)
             if now_local_n >= next_change:
@@ -177,13 +189,13 @@ def consumer_write_file(q, other):
                 next_change = valid_inter.max_val
                 valid_fname = calc_filename(now_local_n, name=insconf.name)
                 init_file(
-                    os.path.join(other.dirname, valid_fname),
+                    os.path.join(config.dirname, valid_fname),
                     insconf,
-                    other.location
+                    config.location
                 )
             _logger.debug('write to file')
-            write_to_file(payload, other.dirname, valid_fname)
-            q.task_done()
+            write_to_file(payload, config.dirname, valid_fname)
+            intput_q.task_done()
         else:
             _logger.info('end file writer consumer thread')
             # other.client.loop_stop()
@@ -191,7 +203,7 @@ def consumer_write_file(q, other):
 
 
 def update_p(payload):
-    # try file
+    """Update payload with tstamp_local"""
     now = payload['tstamp']
     local_tz = payload['localtz']
     now_utc = pytz.utc.localize(now)
@@ -201,11 +213,11 @@ def update_p(payload):
 
 
 def write_to_file(payload, dirname, filename):
-
+    """Write payload to file"""
     payload['tstamp_str'] = payload['tstamp'].isoformat('T', timespec='milliseconds')
     payload['tstamp_local_str'] = payload['tstamp_local'].replace(tzinfo=None).isoformat('T', timespec='milliseconds')
     # m.isoformat('T', timespec='milliseconds')
-    line_tpl = "{tstamp_str};{tstamp_local_str};{temp_sky};{temp_ambient};{freq};{magnitude:.2f};{zero_point}"
+    line_tpl = "{tstamp_str};{tstamp_local_str};{temp_sky};{temp_ambient};{freq_sensor};{magnitude:.2f};{zero_point}"
     with open(os.path.join(dirname, filename), 'a') as fd:
         if payload['cmd'] == 'r':
             if 'temp_ambient' not in payload:

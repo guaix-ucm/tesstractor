@@ -54,11 +54,8 @@ class SQMConf(PhotometerConf):
 
 class SQM(Device):
     def __init__(self, name="unknown", model='unknown'):
-        super().__init__()
+        super().__init__(name, model)
         # Get Photometer identification codes
-
-        self.name = name
-        self.model = model
         self.protocol_number = 0
         self.model_number = 0
         self.feature_number = 0
@@ -106,9 +103,9 @@ class SQM(Device):
         else:
             raise ValueError('process_metadata')
 
-    def process_data(self, match):
+    def process_msg(self, match):
         self.rx_readout = match.group()
-        result = {}
+        result = dict()
         result['name'] = self.name
         result['model'] = 'SQM'
         result['cmd'] = match.group('cmd').decode('utf-8')
@@ -117,7 +114,6 @@ class SQM(Device):
         result['period'] = float(match.group('period'))
         result['temp_ambient'] = float(match.group('temp_ambient'))
         return result
-
 
     def process_calibration(self, match):
         if match:
@@ -215,7 +211,7 @@ class SQM(Device):
             logger.debug("msg is %s", msg)
             match = MEASURE_RE.match(msg)
             if match:
-                pmsg = self.process_data(match)
+                pmsg = self.process_msg(match)
                 logger.debug('data is %s', pmsg)
 
                 if pmsg['magnitude'] < 0:
@@ -307,7 +303,7 @@ class SQMTest(SQM):
     def read_data(self, tries=1):
         msg = self.rx
         match = MEASURE_RE.match(msg)
-        return self.process_data(match)
+        return self.process_msg(match)
 
 
 def filter_buffer(payloads):

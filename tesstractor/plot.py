@@ -1,5 +1,5 @@
 #
-# Copyright 2018-2019 Universidad Complutense de Madrid
+# Copyright 2018-2022 Universidad Complutense de Madrid
 #
 # This file is part of tesstractor
 #
@@ -30,10 +30,11 @@ import tesstractor.reader
 
 # Style for saving into PNG
 my_style1 = {
-   "figure.figsize": (9, 7),
+    "figure.figsize": (9, 7),
     "savefig.dpi": 200,
     "axes.labelsize": 14
 }
+
 
 def plot_sun(ax, site, base_time):
     # SUN

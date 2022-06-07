@@ -9,8 +9,51 @@
 
 
 class Device:
+    """Photometric device"""
     def __init__(self, name="unknown", model='unknown'):
         super().__init__()
+        self.name = name
+        self.model = model
+
+        self.serial_number = self.name
+        self.calibration = 20.5
+
+    def start_connection(self):
+        pass
+
+    def static_conf(self):
+        pass
+
+    def read_msg(self):
+        """Read the photometer"""
+        pass
+
+    def process_message(self, msg):
+        pass
+
+    def process_msg(self, msg):
+        return self.process_msg(msg)
+
+    def read_data(self, tries=1):
+        """Read measurements.
+
+        Keep trying until it reads actual data
+        """
+
+        this_try = 0
+        while this_try < tries:
+            msg = self.read_msg()
+            if msg:
+                proc_msg = self.process_msg(msg)
+                return proc_msg
+            else:
+                this_try += 1
+
+        text = f'unable to read data after {tries} tries'
+        raise ValueError(text)
+
+    def filter_buffer(self, list_of_payload):
+        pass
 
 
 class PhotometerConf:
