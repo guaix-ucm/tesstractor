@@ -15,7 +15,7 @@ import math
 import datetime
 import json
 import typing
-
+import warnings
 
 from .device import Device, PhotometerConf
 
@@ -153,6 +153,7 @@ class Tess(Device):
         return capabilities
 
     def filter_buffer(self, payloads):
+        # This function is not used anymore
         npayloads = len(payloads)
         result = dict(payloads[0])
         # we have to average
@@ -161,7 +162,7 @@ class Tess(Device):
         if any([p['freq'] <= 0 for p in payloads]):
             # FIXME: over/underflow
             result['freq'] = result['freq_sensor'] = 0
-            result['magnitude'] = 99
+            result['magnitude'] = 99.0
         else:
             for key in ['freq_sensor']:
                 result[key] = sum(p[key] for p in payloads) / npayloads
@@ -170,26 +171,6 @@ class Tess(Device):
             # print(any([p['freq'] <= 0 for p in payloads]))
             result['freq'] = result['freq_sensor'] / 1000.0
             result['magnitude'] = self.calibration - 2.5 * math.log10(result['freq'])
-
-        # average times
-        ts0 = payloads[0]['tstamp']
-        ts = [(p['tstamp'] - ts0) for p in payloads]
-        result['tstamp'] = ts0 + sum(ts, datetime.timedelta(0)) / npayloads
-        return result
-
-    @classmethod
-    def filter_buffer2(cls, payloads):
-        npayloads = len(payloads)
-        result = dict(payloads[0])
-        # we have to average
-        # tstamp, freq, freq_sensor, magnitude
-        # magnitude corresponds to the mag of the average freq
-        for key in ['freq_sensor']:
-            result[key] = sum(p[key] for p in payloads) / npayloads
-
-        result['freq'] = result['freq_sensor'] / 1000.0
-        mags = [p['magnitude'] for p in payloads]
-        result['magnitude'] = average_mags(mags)
 
         # average times
         ts0 = payloads[0]['tstamp']
@@ -409,11 +390,13 @@ class TessV2(Tess):
 
         msg_zp = res.get('ZP')
         if self.calibration != msg_zp:
-            print('RUNTIME WARNING', self.calibration, msg_zp)
+            msg = "Calibration values don't agree: self:{} payload:{}".format(self.calibration, msg_zp)
+            warnings.warn(msg, RuntimeWarning)
 
         msg_rev = res.get('rev')
-        if 2 != msg_rev:
-            print('RUNTIME WARNING', 2, msg_rev)
+        if msg_rev != 2:
+            msg = "Protocol values don't agree: self:{} payload:{}".format(2, msg_rev)
+            warnings.warn(msg, RuntimeWarning)
 
         # Actual lectures from the photometer
         payload['freq_sensor'] = res.get('freq') # Actual measurement, in Hz
