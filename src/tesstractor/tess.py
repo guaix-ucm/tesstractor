@@ -405,6 +405,7 @@ class TessV2(Tess):
         payload['cmd'] = 'r'
         payload['protocol_revision'] = 2
         payload['zero_point'] = self.calibration
+        payload['name'] = self.name
 
         msg_zp = res.get('ZP')
         if self.calibration != msg_zp:

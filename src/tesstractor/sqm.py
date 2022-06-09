@@ -11,7 +11,7 @@
 import logging
 import time
 import re
-import math
+import datetime
 
 import numpy
 
@@ -80,14 +80,6 @@ class SQM(Device):
         conf.zero_point = self.calibration
         return conf
 
-    def filter_buffer(self, payloads):
-
-        return filter_buffer(payloads)
-
-    @classmethod
-    def filter_buffer2(cls, payloads):
-        return filter_buffer(payloads)
-
     def process_metadata(self, match):
         if match:
             self.ix_readout = match.group()
@@ -103,16 +95,24 @@ class SQM(Device):
         else:
             raise ValueError('process_metadata')
 
-    def process_msg(self, match):
+    def process_msg(self, match) -> dict:
+        """Convert the message from the photometer to unified format"""
         self.rx_readout = match.group()
         result = dict()
         result['name'] = self.name
         result['model'] = 'SQM'
         result['cmd'] = match.group('cmd').decode('utf-8')
         result['magnitude'] = float(match.group('magnitude'))
-        result['freq'] = int(match.group('freq'))
+        #result['freq'] = int(match.group('freq'))
+        result['freq_sensor'] = int(match.group('freq'))
         result['period'] = float(match.group('period'))
         result['temp_ambient'] = float(match.group('temp_ambient'))
+        result['zero_point'] = self.calibration
+
+        # Add time information
+        # Complete the payload with tstamp
+        now = datetime.datetime.utcnow()
+        result['tstamp'] = now
         return result
 
     def process_calibration(self, match):
@@ -304,34 +304,3 @@ class SQMTest(SQM):
         msg = self.rx
         match = MEASURE_RE.match(msg)
         return self.process_msg(match)
-
-
-def filter_buffer(payloads):
-    mags = [p['magnitude'] for p in payloads]
-    _logger.debug('filter values (median): %s', mags)
-    avg_mag = median_mags(mags)
-    _logger.debug('result is: %s', avg_mag)
-    # return avg payload
-    avg_payload = dict(payloads[0])
-    avg_payload['magnitude'] = avg_mag
-    return avg_payload
-
-
-def average_mags(mags):
-    # to avoid overflows reference to the brightest mag
-    min_mag = min(mags)
-    fluxes = [10**(-0.4 * (m - min_mag)) for m in mags]
-    avg_flux = sum(fluxes) / len(fluxes)
-    avg_mag = min_mag - 2.5 * math.log10(avg_flux)
-    # return avg payload
-    return avg_mag
-
-
-def median_mags(mags):
-    # to avoid overflows reference to the brightest mag
-    min_mag = min(mags)
-    fluxes = [10**(-0.4 * (m - min_mag)) for m in mags]
-    med_flux = numpy.median(fluxes)
-    med_mag = min_mag - 2.5 * math.log10(med_flux)
-    # return avg payload
-    return med_mag

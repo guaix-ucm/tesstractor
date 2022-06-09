@@ -155,6 +155,13 @@ def build_dev_from_ini(section) -> Device:
         raise ValueError('unkown model {}'.format(model))
 
 
+def readerconf_from_ini(section):
+    readerconf = dict()
+    readerconf['nsamples'] = section.getint('nsamples', 0)
+    readerconf['tsample'] = section.getfloat('tsample', 1.0)
+    return readerconf
+
+
 def create_mqtt_workers(
         q_worker: queue.Queue,
         mqtt_config) -> List[threading.Thread]:
@@ -284,15 +291,19 @@ def main(args=None):
     cparser.read_dict(ini_overrides)
 
     loc_conf = build_location_from_ini(cparser)
-
+    loc_tz = pytz.timezone(loc_conf.timezone)
     photo_sections = [sec for sec in cparser.sections() if sec.startswith('photometer')]
 
     photolist = []
+    readerlist = []
     for secname in photo_sections:
         section = cparser[secname]
         if section.getboolean('enabled', True):
             newdev = build_dev_from_ini(section)
+            newread = readerconf_from_ini(section)
+            newread['tz'] = loc_tz
             photolist.append(newdev)
+            readerlist.append(newread)
 
     nsqm = len(photolist)
 
@@ -307,7 +318,7 @@ def main(args=None):
 
     # Using first device
     photo_dev = photolist[0]
-
+    readerconf = readerlist[0]
     photo_dev.start_connection()
 
     # Working queues
@@ -365,8 +376,6 @@ def main(args=None):
 
     # starting only one reader
     # Preliminary configuration here
-    readerconf = {}
-    readerconf['nsamples'] = 0  # Samples averaged together
     readerconf['tz'] = pytz.timezone(loc_conf.timezone)
 
     # This thread ends in exit_event

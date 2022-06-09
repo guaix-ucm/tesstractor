@@ -68,7 +68,9 @@ class MqttConsumer:
             self.seq += 1
             # This may depend on the device
             payload['name'] = msg['name']
-            payload['freq'] = msg['freq']
+            payload['freq'] = msg['freq_sensor']
+            if 'protocol_revision' in msg:
+                payload['rev'] = msg['protocol_revision']
             payload['mag'] = msg['magnitude']
             if 'temp_ambient' in msg:
                 payload['tamb'] = msg['temp_ambient']

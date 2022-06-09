@@ -37,7 +37,7 @@ def read_photometer_timed(
     internal_buffer = []
 
     nsamples = readerconf.get('nsamples', 5)
-    exit_check_timeout = 1
+    exit_check_timeout = readerconf.get('tsample', 1)
     # print('(1)timed_reader, reading every ', timeout, 's')
     # initialice connection. read metadata and calibration
 
