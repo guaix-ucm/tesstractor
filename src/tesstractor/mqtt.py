@@ -64,7 +64,7 @@ class MqttConsumer:
             return response
         elif msg['cmd'] == 'r':
             _logger.debug('enter publish')
-            payload = dict(seq=self.seq, name='unknown', freq=0.0, mag=0.0, tamb=99.0, tsky=99.0, rev=1)
+            payload = dict(seq=self.seq, name='unknown', freq=0.0, mag=0.0, tamb=0.0, tsky=0.0, rev=1)
             self.seq += 1
             # This may depend on the device
             payload['name'] = msg['name']
