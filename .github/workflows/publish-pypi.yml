@@ -10,7 +10,7 @@ permissions:
   contents: read
 
 jobs:
-  build_sources:
+  build_dist_and_upload:
     runs-on: ubuntu-latest
 
     steps:
