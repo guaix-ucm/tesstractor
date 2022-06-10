@@ -1,0 +1,33 @@
+name: Build and upload to PyPI
+
+# Build on every branch push, tag push, and pull request change:
+on: [workflow_dispatch]
+
+permissions:
+  contents: read
+
+jobs:
+  build_sources:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-python@v4
+        with:
+          python-version: '3.x'
+
+      - name: Install build
+        run: |
+          python -m pip install --upgrade pip
+          pip install build
+
+      - name: Build package
+        run: |
+          python -m build
+
+      - uses: actions/upload-artifact@v3
+        with:
+          name: pkg_files
+          path: |
+            dist/*.tar.gz
+            dist/*.whl
