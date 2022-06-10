@@ -7,4 +7,4 @@
 # License-Filename: LICENSE.txt
 #
 
-__version__ = '0.6.dev1'
+__version__ = '0.6.0'
