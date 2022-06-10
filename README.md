@@ -1,5 +1,4 @@
-[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.2563654.svg)](https://doi.org/10.5281/zenodo.2563654)
-[![Build Status](https://travis-ci.org/guaix-ucm/tesstractor.svg?branch=master)](https://travis-ci.org/guaix-ucm/tesstractor)
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.2563065.svg)](https://doi.org/10.5281/zenodo.2563065)
 
 # TESStractor #
 
