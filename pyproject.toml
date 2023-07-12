@@ -1,5 +1,5 @@
 [build-system]
-requires = ["setuptools >= 43.0.0", "wheel"]
+requires = ["setuptools >= 61.0.0", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
@@ -48,3 +48,10 @@ Repository = "https://github.com/guaix-ucm/tesstractor.git"
 [project.scripts]
 tesstractor = "tesstractor.cli:main"
 tesstractor-plot = "tesstractor.plot:main"
+
+# without this, still works, performs autodetection
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.dynamic]
+version = {attr = "tesstractor.__version__"}
