@@ -85,6 +85,7 @@ class Tess(Device):
         result['name'] = self.name
         result['model'] = 'TESS'
         result['freq_sensor'] = 0.0
+        result['valid'] = False
 
         if re_m['freq_pref'] is None:
             return result
@@ -120,6 +121,8 @@ class Tess(Device):
         for key in acc_keys:
             if re_m[key] is not None:
                 result[key] = int(re_m[key])
+
+        result['valid'] = True
         return result
 
     def check_capabilities(self, match):

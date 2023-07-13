@@ -107,7 +107,7 @@ class SQM(Device):
         result['period'] = float(match.group('period'))
         result['temp_ambient'] = float(match.group('temp_ambient'))
         result['zero_point'] = self.calibration
-
+        result['valid'] = True
         # Add time information
         # Complete the payload with tstamp
         now = datetime.datetime.utcnow()

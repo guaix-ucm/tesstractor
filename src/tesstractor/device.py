@@ -32,7 +32,7 @@ class Device:
         pass
 
     def process_msg(self, msg):
-        return self.process_msg(msg)
+        pass
 
     def read_data(self, tries=1):
         """Read measurements.

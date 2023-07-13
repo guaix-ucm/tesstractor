@@ -8,14 +8,15 @@
 #
 
 import datetime
-import threading
 import logging
-import typing
 import math
 import queue
+import threading
+import typing
+import warnings
 
-import tzlocal
 import numpy
+import tzlocal
 
 from tesstractor.sqm import Device
 
@@ -134,7 +135,8 @@ def avg_device_buffer(payloads):
     # TODO: analyze if there are values <= 0, extreme values, etc.
     vals_0 = list(filter(lambda x: x > 0, vals))
     if len(vals_0) != len(vals):
-        print("WARNING, some measurements have freq <= 0")
+        msg = "some measurements have freq <= 0"
+        warnings.warn(msg, RuntimeWarning)
 
     if vals_0:
         # Computing median
