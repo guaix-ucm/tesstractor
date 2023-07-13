@@ -1,16 +1,7 @@
 
-import math
-
 import pytest
 
-from ..sqm import average_mags
 from ..sqm import MEASURE_RE, META_RE, CALIB_RE
-
-
-def test_average_mags():
-    mags = [18.0, 18.2, 18.1, 18.3, 18.0, 17.9]
-    avg = average_mags(mags)
-    assert math.isclose(avg, 18.075134849451306)
 
 
 @pytest.mark.parametrize('msg', [

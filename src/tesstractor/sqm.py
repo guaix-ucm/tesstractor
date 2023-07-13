@@ -1,5 +1,5 @@
 #
-# Copyright 2018-2019 Universidad Complutense de Madrid
+# Copyright 2018-2023 Universidad Complutense de Madrid
 #
 # This file is part of tessreader
 #
@@ -13,7 +13,6 @@ import time
 import re
 import datetime
 
-import numpy
 
 from .device import Device, PhotometerConf
 
@@ -103,7 +102,7 @@ class SQM(Device):
         result['model'] = 'SQM'
         result['cmd'] = match.group('cmd').decode('utf-8')
         result['magnitude'] = float(match.group('magnitude'))
-        #result['freq'] = int(match.group('freq'))
+        # result['freq'] = int(match.group('freq'))
         result['freq_sensor'] = int(match.group('freq'))
         result['period'] = float(match.group('period'))
         result['temp_ambient'] = float(match.group('temp_ambient'))

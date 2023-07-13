@@ -10,6 +10,3 @@ def test_config(capsys):
     out, err = capsys.readouterr()
     # last character in out is \n
     assert data == out[:-1]
-
-
-
