@@ -1,5 +1,5 @@
 #
-# Copyright 2018-2022 Universidad Complutense de Madrid
+# Copyright 2018-2023 Universidad Complutense de Madrid
 #
 # This file is part of tesstractor
 #
@@ -123,6 +123,7 @@ def avg_device_buffer(payloads):
     """Average n measurements"""
     npayloads = len(payloads)
     result = dict(payloads[0])
+    result['valid'] = True
 
     # we have to average
     # tstamp and freq_sensor
@@ -142,6 +143,7 @@ def avg_device_buffer(payloads):
     else:
         result['freq_sensor'] = 0
         result['magnitude'] = -99
+        result['valid'] = False
 
     # These two are averages
     for key in ['temp_ambient', 'temp_sky']:
@@ -225,8 +227,9 @@ def periodic_avg_task(q_in1: queue.Queue, q_out: queue.Queue, other):
     if buffer:
         # Queue processed value
         result = avg_device_buffer(buffer)
-        # Send result to output queue
-        q_out.put(result)
+        # Send result to output queue if value is valid
+        if result['valid']:
+            q_out.put(result)
     else:
         pass
 
