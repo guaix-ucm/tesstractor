@@ -55,6 +55,9 @@ class Device:
     def filter_buffer(self, list_of_payload):
         pass
 
+    def register_id(self):
+        return self.serial_number
+
 
 class PhotometerConf:
     name = 'somename'

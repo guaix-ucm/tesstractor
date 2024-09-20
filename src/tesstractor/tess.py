@@ -50,7 +50,6 @@ class Tess(Device):
         self.protocol_number = 0
         self.model_number = 0
         self.feature_number = 0
-        self.serial_number = self.name
 
         self.mac = "01:23:45:67:89:AB"
         self.cmd_wait = 0
@@ -65,6 +64,10 @@ class Tess(Device):
         conf.zero_point = self.calibration
         conf.mac_address = self.mac
         return conf
+
+    def register_id(self):
+        """ID used for registration"""
+        return self.mac
 
     def process_metadata(self, match):
         if match:

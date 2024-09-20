@@ -109,7 +109,6 @@ def build_dev_from_ini(section) -> Device:
         timeout = section.getfloat('timeout', 2.0)
         conn = serial.Serial(port, baudrate, timeout=timeout)
         photo_dev = SQMLU(conn, name)
-        # FIXME: workaround to handle MAC
         mac = section.get('mac')
         if mac:
             photo_dev.mac = mac
@@ -127,7 +126,6 @@ def build_dev_from_ini(section) -> Device:
         photo_dev = tesstractor.tess.TessR(conn, name)
         zero_point = section.getfloat('zero_point', 20.0)
         photo_dev.calibration = zero_point
-        # FIXME: workaround to handle MAC
         mac = section.get('mac')
         if mac:
             photo_dev.mac = mac
@@ -145,7 +143,6 @@ def build_dev_from_ini(section) -> Device:
         photo_dev = tesstractor.tess.TessV2(conn, name)
         zero_point = section.getfloat('zero_point', 20.0)
         photo_dev.calibration = zero_point
-        # FIXME: workaround to handle MAC
         mac = section.get('mac')
         if mac:
             photo_dev.mac = mac

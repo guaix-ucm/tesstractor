@@ -48,14 +48,13 @@ def read_photometer_timed(
         # Read calibration
         # device.read_calibration()
 
-        mac = str(device.serial_number)
         now = datetime.datetime.utcnow()
         local_tz = readerconf.get('tz', tzlocal.get_localzone())
 
         payload_init = dict(
             name=device.name,
             model=device.model,
-            mac=mac,
+            mac=str(device.register_id()),
             calib=device.calibration,
             rev=1,
             cmd='id',
@@ -178,7 +177,7 @@ def simple_buffer(q_in, q_out, q_buffer, other):
     """Separates payload per command
 
     If cmd is 'r', goes to q_buffer
-    If cmd is 'id', it goes q_to out
+    If cmd is 'id', it goes to q_out
     """
     thisth = threading.current_thread()
     _logger.debug(f'starting filter buffer thread, {thisth.name}')
