@@ -1,5 +1,5 @@
 [build-system]
-requires = ["setuptools >= 61.0.0", "wheel"]
+requires = ["setuptools>=64", "setuptools_scm>=8"]
 build-backend = "setuptools.build_meta"
 
 [project]
@@ -54,5 +54,4 @@ tesstractor-plot = "tesstractor.plot:main"
 [tool.setuptools.packages.find]
 where = ["src"]
 
-[tool.setuptools.dynamic]
-version = {attr = "tesstractor.__version__"}
+[tool.setuptools_scm]

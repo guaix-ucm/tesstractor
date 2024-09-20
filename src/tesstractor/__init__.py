@@ -6,5 +6,3 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 # License-Filename: LICENSE.txt
 #
-
-__version__ = '0.7.dev1'
