@@ -217,7 +217,8 @@ def write_to_file(payload, dirname, filename):
     payload['tstamp_str'] = payload['tstamp'].isoformat('T', timespec='milliseconds')
     payload['tstamp_local_str'] = payload['tstamp_local'].replace(tzinfo=None).isoformat('T', timespec='milliseconds')
     # m.isoformat('T', timespec='milliseconds')
-    line_tpl = "{tstamp_str};{tstamp_local_str};{temp_ambient:.2f};{temp_sky:.2f};{freq_sensor};{magnitude:.2f};{zero_point}"
+    line_tpl = "{tstamp_str};{tstamp_local_str};{temp_ambient:.2f};" \
+               "{temp_sky:.2f};{freq_sensor};{magnitude:.2f};{zero_point}"
     with open(os.path.join(dirname, filename), 'a') as fd:
         if payload['cmd'] == 'r':
             if 'temp_ambient' not in payload:

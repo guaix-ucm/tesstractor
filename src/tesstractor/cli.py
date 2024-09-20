@@ -21,7 +21,7 @@ import attr
 import pytz
 
 from tesstractor.sqm import SQMTest, SQMLU
-from tesstractor.tess import Tess
+# from tesstractor.tess import Tess
 from tesstractor.device import Device
 import tesstractor.mqtt as mqtt
 import tesstractor.writef

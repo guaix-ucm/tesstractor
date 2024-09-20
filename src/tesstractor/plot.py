@@ -26,7 +26,7 @@ import astropy.units as u
 import astroplan
 
 # Import IDA format reader
-import tesstractor.reader
+import tesstractor.reader  # noqa
 
 # Style for saving into PNG
 my_style1 = {

@@ -361,7 +361,7 @@ class TessV2(Tess):
         this_try = 0
         while this_try < tries:
             msg = self.read_msg()
-            #logger.debug("msg is %s", msg)
+            # logger.debug("msg is %s", msg)
             try:
                 res = json.loads(msg)
             except ValueError:
@@ -374,8 +374,8 @@ class TessV2(Tess):
                 return pmsg
             else:
                 # We expect several non-json messages between correct msgs
-                #logger.debug('ignoring %s', msg)
-                #this_try += 1
+                # logger.debug('ignoring %s', msg)
+                # this_try += 1
                 return None
 
         msg = f'unable to read data after {tries} tries'
@@ -405,7 +405,7 @@ class TessV2(Tess):
             warnings.warn(msg, RuntimeWarning)
 
         # Actual lectures from the photometer
-        payload['freq_sensor'] = res.get('freq') # Actual measurement, in Hz
+        payload['freq_sensor'] = res.get('freq')  # Actual measurement, in Hz
         payload['magnitude'] = res.get('mag')
         payload['temp_ambient'] = res.get('tamb')
         payload['temp_sky'] = res.get('tsky')

@@ -11,7 +11,7 @@
 import re
 import argparse
 
-from astropy.io import registry
+# from astropy.io import registry
 import astropy.table
 import astropy.io.ascii
 import astropy.units as u
