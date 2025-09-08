@@ -7,17 +7,16 @@ name = "tesstractor"
 dynamic = ["version"]
 description = "TESS photometer reading software"
 readme = "README.md"
-requires-python = ">=3.8"
+requires-python = ">=3.10"
 license = {text = "GPL-3.0-or-later"}
 authors = [
   {name = "Sergio Pascual", email = "sergiopr@fis.ucm.es"},
 ]
 classifiers = [
-    "Programming Language :: Python :: 3.8",
-    "Programming Language :: Python :: 3.9",
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
     "Development Status :: 3 - Alpha",
     "Environment :: Console",
     "Intended Audience :: Science/Research",
@@ -26,15 +25,15 @@ classifiers = [
     "Topic :: Scientific/Engineering :: Astronomy",
 ]
 dependencies = [
-    "pytz",
-    "tzlocal",
-    "pyserial",
-    "paho-mqtt",
+    "astroplan",
+    "astropy",
     "attrs>=17.4.0",
     "matplotlib",
     "numpy",
-    "astroplan",
-    "astropy",
+    "paho-mqtt",
+    "pyserial",
+    "pytz",
+    "tzlocal",
 ]
 
 [project.optional-dependencies]
