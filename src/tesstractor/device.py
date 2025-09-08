@@ -10,7 +10,8 @@
 
 class Device:
     """Photometric device"""
-    def __init__(self, name="unknown", model='unknown'):
+
+    def __init__(self, name="unknown", model="unknown"):
         super().__init__()
         self.name = name
         self.model = model
@@ -49,7 +50,7 @@ class Device:
             else:
                 this_try += 1
 
-        text = f'unable to read data after {tries} tries'
+        text = f"unable to read data after {tries} tries"
         raise ValueError(text)
 
     def filter_buffer(self, list_of_payload):
@@ -60,11 +61,11 @@ class Device:
 
 
 class PhotometerConf:
-    name = 'somename'
-    model = 'somemodel'
+    name = "somename"
+    model = "somemodel"
     serial_number = 1
     mac_address = "01:23:45:67:89:AB"
-    filter = 'b'
+    filter = "b"
     azimuth = 0.0
     altitude = 0.0
     fov = 20

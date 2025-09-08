@@ -29,11 +29,7 @@ import astroplan
 import tesstractor.reader  # noqa
 
 # Style for saving into PNG
-my_style1 = {
-    "figure.figsize": (9, 7),
-    "savefig.dpi": 200,
-    "axes.labelsize": 14
-}
+my_style1 = {"figure.figsize": (9, 7), "savefig.dpi": 200, "axes.labelsize": 14}
 
 
 def plot_sun(ax, site, base_time):
@@ -46,7 +42,7 @@ def plot_sun(ax, site, base_time):
     # Time of lower alt of the sun
     sun_a = site.target_meridian_antitransit_time(base_time, get_sun(base_time))
     sun_a_dt = site.astropy_time_to_datetime(sun_a)
-    ax.axvline(sun_a_dt, color='k', ls='--', lw=2, alpha=0.5, clip_on=True)
+    ax.axvline(sun_a_dt, color="k", ls="--", lw=2, alpha=0.5, clip_on=True)
 
     tmin_utc = tmin.astimezone(pytz.utc)
     tmax_utc = tmax.astimezone(pytz.utc)
@@ -65,8 +61,8 @@ def plot_sun(ax, site, base_time):
 
     # print('min alt:', min_alt.deg, 'max alt:', max_alt.deg)
 
-    there_is_day = (max_alt > 0)
-    there_is_night = (min_alt < 0)
+    there_is_day = max_alt > 0
+    there_is_night = min_alt < 0
 
     if there_is_day and there_is_night:
         # print('n & d')
@@ -75,8 +71,8 @@ def plot_sun(ax, site, base_time):
         sun_e_dt = site.astropy_time_to_datetime(sun_e)
         sun_m_dt = site.astropy_time_to_datetime(sun_m)
 
-        ax.axvline(sun_e_dt, color='g', ls='--', lw=2, alpha=0.5, clip_on=True)
-        ax.axvline(sun_m_dt, color='r', ls='--', lw=2, alpha=0.5, clip_on=True)
+        ax.axvline(sun_e_dt, color="g", ls="--", lw=2, alpha=0.5, clip_on=True)
+        ax.axvline(sun_m_dt, color="r", ls="--", lw=2, alpha=0.5, clip_on=True)
 
         # Aprox, the same hour, but tomorrow
         sun_en_dt = sun_e_dt + timedelta(days=1)
@@ -93,17 +89,22 @@ def plot_sun(ax, site, base_time):
             sun_e_dt = site.astropy_time_to_datetime(sun_e)
             sun_m_dt = site.astropy_time_to_datetime(sun_m)
 
-            ax.axvline(sun_e_dt, color='g', ls='--', lw=2, alpha=0.5, clip_on=True)
-            ax.axvline(sun_m_dt, color='r', ls='--', lw=2, alpha=0.5, clip_on=True)
+            ax.axvline(sun_e_dt, color="g", ls="--", lw=2, alpha=0.5, clip_on=True)
+            ax.axvline(sun_m_dt, color="r", ls="--", lw=2, alpha=0.5, clip_on=True)
     else:
         if there_is_day:
-            print('The sun is over the horizon all day')
+            print("The sun is over the horizon all day")
             rect = mpatches.Rectangle(
-                (0, 0), width=1, height=1,
-                transform=ax.transAxes, color='blue', alpha=0.1)
+                (0, 0),
+                width=1,
+                height=1,
+                transform=ax.transAxes,
+                color="blue",
+                alpha=0.1,
+            )
             ax.add_patch(rect)
         else:
-            print('The sun is under the horizon all night')
+            print("The sun is under the horizon all night")
     # Reset
     ax.set_xlim((tmin, tmax))
 
@@ -128,10 +129,10 @@ def plot_moon(ax, site, base_time):
     min_alt = min(moon_altaz.alt)
     max_alt = max(moon_altaz.alt)
 
-    print('min alt:', min_alt.deg, 'max alt:', max_alt.deg)
+    print("min alt:", min_alt.deg, "max alt:", max_alt.deg)
     ax.set_ylim([0, 90])
-    ax.set_ylabel('Moon altitude (deg)')
-    ax.plot(ctimes_dt, moon_altaz.alt, ls='-.', lw=1, color='black')
+    ax.set_ylabel("Moon altitude (deg)")
+    ax.plot(ctimes_dt, moon_altaz.alt, ls="-.", lw=1, color="black")
 
 
 def gen_plot(ax, tval, magval, site, ref_day, meta):
@@ -142,7 +143,7 @@ def gen_plot(ax, tval, magval, site, ref_day, meta):
     next_day = ref_day + timedelta(days=1)
     base_time = Time(ref_day.astimezone(pytz.utc))
     if len(tval) > 0:
-        ax.plot(tval, magval, '+')
+        ax.plot(tval, magval, "+")
     else:
         t1 = ref_day
         t2 = ref_day + timedelta(seconds=7200)
@@ -150,12 +151,12 @@ def gen_plot(ax, tval, magval, site, ref_day, meta):
     utco = ref_day.strftime("%z")
     day1 = ref_day.strftime("%Y-%m-%d")
     day2 = next_day.strftime("%Y-%m-%d")
-    title_label1 = 'device: {device_type} {instrument_id}'.format(**meta)
-    title_label2 = 'date: {}/{}'.format(day1, day2)
-    title_label = '{:^15}   {:^15}'.format(title_label1, title_label2)
+    title_label1 = "device: {device_type} {instrument_id}".format(**meta)
+    title_label2 = "date: {}/{}".format(day1, day2)
+    title_label = "{:^15}   {:^15}".format(title_label1, title_label2)
     ax.set_title(title_label)
-    ax.set_xlabel('Local time (UTC {})'.format(utco))
-    ax.set_ylabel('sky brightness (mag / arcsec^2)')
+    ax.set_xlabel("Local time (UTC {})".format(utco))
+    ax.set_ylabel("sky brightness (mag / arcsec^2)")
     # SUN
     plot_sun(ax, site, base_time)
     # MOON
@@ -174,12 +175,12 @@ def do_plots_on_dir(dirname):
 
     data_files = []
     for f in os.listdir(dirname):
-        if f.endswith('.dat'):
+        if f.endswith(".dat"):
             data_files.append(f)
 
     for filed in sorted(data_files):
         fname, ext = os.path.splitext(filed)
-        filep = fname + '.png'
+        filep = fname + ".png"
         filed_f = os.path.join(dirname, filed)
         filep_f = os.path.join(dirname, filep)
         tfiled = os.path.getmtime(filed_f)
@@ -189,22 +190,21 @@ def do_plots_on_dir(dirname):
             tfilep = 0
 
         if tfiled > tfilep:
-            logger.debug('%s data older than plot, update', filed)
+            logger.debug("%s data older than plot, update", filed)
 
             plot_file(filed_f, filep_f)
         else:
-            logger.debug('%s plot older than data, nothing to do', filep)
+            logger.debug("%s plot older than data, nothing to do", filep)
 
 
 def do_plots_on_file(filename):
     fname, ext = os.path.splitext(filename)
-    filep = fname + '.png'
+    filep = fname + ".png"
     plot_file(filename, filep)
 
 
 def plot_file(filed_f, filep_f):
-    table_obj = astropy.table.Table.read(
-        filed_f, format='ascii.IDA')
+    table_obj = astropy.table.Table.read(filed_f, format="ascii.IDA")
 
     with plt.style.context(my_style1):
         fig = plot_table(table_obj)
@@ -215,16 +215,20 @@ def plot_file(filed_f, filep_f):
 def plot_table(tab):
     min_mag = 12
 
-    lat = tab.meta['lat']
-    lon = tab.meta['lon']
-    height = tab.meta['height']
-    timezone = tab.meta['timezone']
+    lat = tab.meta["lat"]
+    lon = tab.meta["lon"]
+    height = tab.meta["height"]
+    timezone = tab.meta["timezone"]
     location = EarthLocation(lat=lat, lon=lon, height=height)
-    site = astroplan.Observer(location=location, name=tab.meta['location_name'], timezone=timezone)
+    site = astroplan.Observer(
+        location=location, name=tab.meta["location_name"], timezone=timezone
+    )
 
-    t1 = np.array([pytz.utc.localize(datetime.fromisoformat(value)) for value in tab['time_utc']])
+    t1 = np.array(
+        [pytz.utc.localize(datetime.fromisoformat(value)) for value in tab["time_utc"]]
+    )
     tval_local = np.array([tutc.astimezone(site.timezone) for tutc in t1])
-    magval_local = tab['mag']
+    magval_local = tab["mag"]
 
     # Filter mag values above 12
     mask_5 = magval_local > min_mag
@@ -245,7 +249,7 @@ def plot_table(tab):
         day=ref_time.day,
         hour=23,
         minute=55,
-        second=0
+        second=0,
     )
     ref_day = site.timezone.localize(ref_day)
     fig = plt.figure()
@@ -257,25 +261,27 @@ def plot_table(tab):
 def main(args=None):
     # Parse CLI
     parser = argparse.ArgumentParser()
-    parser.add_argument("--log", default='INFO',
-                        choices=['DEBUG', 'INFO', 'WARNING', 'ERROR', 'CRTICAL', 'NOTSET']
-                        )
-    parser.add_argument('path')
+    parser.add_argument(
+        "--log",
+        default="INFO",
+        choices=["DEBUG", "INFO", "WARNING", "ERROR", "CRTICAL", "NOTSET"],
+    )
+    parser.add_argument("path")
     pargs = parser.parse_args(args=args)
 
     loglevel = getattr(logging, pargs.log.upper())
 
     logging.basicConfig(level=loglevel)
     logger = logging.getLogger(__name__)
-    logger.info('tesstractor-plot, starting')
+    logger.info("tesstractor-plot, starting")
 
     if os.path.isdir(pargs.path):
-        logger.debug('path is dir')
+        logger.debug("path is dir")
         do_plots_on_dir(pargs.path)
     else:
-        logger.debug('path is file')
+        logger.debug("path is file")
         do_plots_on_file(pargs.path)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()

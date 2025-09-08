@@ -17,7 +17,8 @@ import datetime
 from .device import Device, PhotometerConf
 
 
-MEASURE_RE = re.compile(br"""
+MEASURE_RE = re.compile(
+    rb"""
                 \s* # Skip whitespace
                 (?P<cmd>r),
                 (?P<magnitude>[\-\s]\d{2}\.\d{2})m,
@@ -25,24 +26,32 @@ MEASURE_RE = re.compile(br"""
                 (?P<period_counts>\d{10})c,
                 (?P<period>\d{7}\.\d{3})s,
                 (?P<temp_ambient>[\-\s]\d{3}\.\d)C
-                """, re.VERBOSE)
+                """,
+    re.VERBOSE,
+)
 
-CALIB_RE = re.compile(br"""
+CALIB_RE = re.compile(
+    rb"""
                 (?P<cmd>c),
                 (?P<light_cal>\d{8}\.\d{2})m,
                 (?P<dark_period>\d{7}\.\d{3})s,
                 (?P<light_cal_temp>[\-\s]\d{3}\.\d)C,
                 (?P<off_ref>\d{8}\.\d{2})m,
                 (?P<dark_cal_temp>[\-\s]\d{3}\.\d)C
-                """, re.VERBOSE)
+                """,
+    re.VERBOSE,
+)
 
-META_RE = re.compile(br"""
+META_RE = re.compile(
+    rb"""
                 (?P<cmd>i),
                 (?P<protocol_number>\d{8}),
                 (?P<model_number>\d{8}),
                 (?P<feature_number>\d{8}),
                 (?P<serial_number>\d{8})
-                """, re.VERBOSE)
+                """,
+    re.VERBOSE,
+)
 
 _logger = logging.getLogger(__name__)
 
@@ -52,7 +61,7 @@ class SQMConf(PhotometerConf):
 
 
 class SQM(Device):
-    def __init__(self, name="unknown", model='unknown'):
+    def __init__(self, name="unknown", model="unknown"):
         super().__init__(name, model)
         # Get Photometer identification codes
         self.protocol_number = 0
@@ -82,45 +91,48 @@ class SQM(Device):
     def process_metadata(self, match):
         if match:
             self.ix_readout = match.group()
-            self.protocol_number = int(match.group('protocol_number'))
-            self.model_number = int(match.group('model_number'))
-            self.feature_number = int(match.group('feature_number'))
-            self.serial_number = int(match.group('serial_number'))
+            self.protocol_number = int(match.group("protocol_number"))
+            self.model_number = int(match.group("model_number"))
+            self.feature_number = int(match.group("feature_number"))
+            self.serial_number = int(match.group("serial_number"))
 
-            return {'cmd': 'i', 'protocol_number': self.protocol_number,
-                    'model_number': self.model_number,
-                    'feature_number': self.feature_number,
-                    'serial_number': self.serial_number}
+            return {
+                "cmd": "i",
+                "protocol_number": self.protocol_number,
+                "model_number": self.model_number,
+                "feature_number": self.feature_number,
+                "serial_number": self.serial_number,
+            }
         else:
-            raise ValueError('process_metadata')
+            raise ValueError("process_metadata")
 
     def process_msg(self, match) -> dict:
         """Convert the message from the photometer to unified format"""
         self.rx_readout = match.group()
         result = dict()
-        result['name'] = self.name
-        result['model'] = 'SQM'
-        result['cmd'] = match.group('cmd').decode('utf-8')
-        result['magnitude'] = float(match.group('magnitude'))
+        result["name"] = self.name
+        result["model"] = "SQM"
+        result["cmd"] = match.group("cmd").decode("utf-8")
+        result["magnitude"] = float(match.group("magnitude"))
         # result['freq'] = int(match.group('freq'))
-        result['freq_sensor'] = int(match.group('freq'))
-        result['period'] = float(match.group('period'))
-        result['temp_ambient'] = float(match.group('temp_ambient'))
-        result['zero_point'] = self.calibration
-        result['valid'] = True
+        result["freq_sensor"] = int(match.group("freq"))
+        result["period"] = float(match.group("period"))
+        result["temp_ambient"] = float(match.group("temp_ambient"))
+        result["zero_point"] = self.calibration
+        result["valid"] = True
         # Add time information
         # Complete the payload with tstamp
         now = datetime.datetime.utcnow()
-        result['tstamp'] = now
+        result["tstamp"] = now
         return result
 
     def process_calibration(self, match):
         if match:
             self.cx_readout = match.group()
-            self.calibration = float(match.group('light_cal'))
-            return {'cmd': 'c', 'calibration': self.calibration}
+            self.calibration = float(match.group("light_cal"))
+            return {"cmd": "c", "calibration": self.calibration}
         else:
-            raise ValueError('process_calibration')
+            raise ValueError("process_calibration")
 
     def start_connection(self):
         pass
@@ -130,7 +142,7 @@ class SQM(Device):
 
     def reset_device(self):
         """Restart connection"""
-        _logger.debug('reset device')
+        _logger.debug("reset device")
         self.close_connection()
         self.start_connection()
 
@@ -139,7 +151,7 @@ class SQM(Device):
 
         logger = logging.getLogger(__name__)
 
-        cmd = b'ix'
+        cmd = b"ix"
         logger.debug("passing command %s", cmd)
         self.pass_command(cmd)
         time.sleep(self.cmd_wait)
@@ -150,18 +162,18 @@ class SQM(Device):
             logger.debug("msg is %s", msg)
             meta_match = META_RE.match(msg)
             if meta_match:
-                logger.debug('process metadata')
+                logger.debug("process metadata")
                 pmsg = self.process_metadata(meta_match)
-                logger.debug('metadata is %s', pmsg)
+                logger.debug("metadata is %s", pmsg)
                 return pmsg
             else:
-                logger.warning('malformed metadata, try again')
+                logger.warning("malformed metadata, try again")
                 this_try += 1
                 time.sleep(self.cmd_wait)
                 self.reset_device()
                 time.sleep(self.cmd_wait)
 
-        logger.error('reading metadata after %d tries', tries)
+        logger.error("reading metadata after %d tries", tries)
         raise ValueError
 
     def read_calibration(self, tries=1):
@@ -169,7 +181,7 @@ class SQM(Device):
 
         logger = logging.getLogger(__name__)
 
-        cmd = b'cx'
+        cmd = b"cx"
         logger.debug("passing command %s", cmd)
         self.pass_command(cmd)
         time.sleep(self.cmd_wait)
@@ -180,18 +192,18 @@ class SQM(Device):
             logger.debug("msg is %s", msg)
             match = CALIB_RE.match(msg)
             if match:
-                logger.debug('process calibration')
+                logger.debug("process calibration")
                 pmsg = self.process_calibration(match)
-                logger.debug('calibration is %s', pmsg)
+                logger.debug("calibration is %s", pmsg)
                 return pmsg
             else:
-                logger.warning('malformed calibration, try again')
+                logger.warning("malformed calibration, try again")
                 this_try += 1
                 time.sleep(self.cmd_wait)
                 self.reset_device()
                 time.sleep(self.cmd_wait)
 
-        logger.error('reading calibration after %d tries', tries)
+        logger.error("reading calibration after %d tries", tries)
         raise ValueError
 
     def read_data(self, tries=1):
@@ -199,7 +211,7 @@ class SQM(Device):
 
         logger = logging.getLogger(__name__)
 
-        cmd = b'rx'
+        cmd = b"rx"
         logger.debug("passing command %s", cmd)
         self.pass_command(cmd)
         time.sleep(self.cmd_wait)
@@ -211,43 +223,43 @@ class SQM(Device):
             match = MEASURE_RE.match(msg)
             if match:
                 pmsg = self.process_msg(match)
-                logger.debug('data is %s', pmsg)
+                logger.debug("data is %s", pmsg)
 
-                if pmsg['magnitude'] < 0:
-                    logger.warning('negative measured magnitude, try again')
+                if pmsg["magnitude"] < 0:
+                    logger.warning("negative measured magnitude, try again")
                     this_try += 1
                     time.sleep(self.cmd_wait)
                     continue
 
                 return pmsg
             else:
-                logger.warning('malformed data, try again')
-                logger.debug('data is %s', msg)
+                logger.warning("malformed data, try again")
+                logger.debug("data is %s", msg)
                 this_try += 1
                 time.sleep(self.cmd_wait)
                 self.reset_device()
                 time.sleep(self.cmd_wait)
 
-        logger.error('reading data after %d tries', tries)
+        logger.error("reading data after %d tries", tries)
         return None
 
     def pass_command(self, cmd):
         pass
 
     def read_msg(self):
-        return b''
+        return b""
 
 
 class SQMLU(SQM):
     def __init__(self, conn, name="", sleep_time=1, tries=10):
-        super().__init__(name=name, model='SQM-LU')
+        super().__init__(name=name, model="SQM-LU")
         self.serial = conn
         # Clearing buffer
         self.read_msg()
 
     def start_connection(self):
         """Start photometer connection"""
-        _logger.debug('start connection')
+        _logger.debug("start connection")
         time.sleep(self.cmd_wait)
         self.read_metadata(tries=10)
         time.sleep(self.cmd_wait)
@@ -258,7 +270,7 @@ class SQMLU(SQM):
     def close_connection(self):
         """End photometer connection"""
         # Check until there is no answer from device
-        _logger.debug('close connection')
+        _logger.debug("close connection")
         answer = True
         while answer:
             answer = self.read_msg()
@@ -276,10 +288,10 @@ class SQMLU(SQM):
 
 class SQMTest(SQM):
     def __init__(self):
-        super().__init__(name='sqmtest', model='SQM-TEST')
-        self.ix = b'i,00000004,00000003,00000023,00002142\r\n'
-        self.cx = b'c,00000019.84m,0000151.517s, 022.2C,00000008.71m, 023.2C\r\n'
-        self.rx = b'r, 19.29m,0000000002Hz,0000277871c,0000000.603s, 029.9C\r\n'
+        super().__init__(name="sqmtest", model="SQM-TEST")
+        self.ix = b"i,00000004,00000003,00000023,00002142\r\n"
+        self.cx = b"c,00000019.84m,0000151.517s, 022.2C,00000008.71m, 023.2C\r\n"
+        self.rx = b"r, 19.29m,0000000002Hz,0000277871c,0000000.603s, 029.9C\r\n"
 
     def start_connection(self):
         """Start photometer connection"""

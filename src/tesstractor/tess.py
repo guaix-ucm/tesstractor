@@ -20,7 +20,8 @@ import warnings
 from .device import Device, PhotometerConf
 
 
-MEASURE_RE = re.compile(br"""
+MEASURE_RE = re.compile(
+    rb"""
     ^(<f(?P<freq_pref>[mH])((?P<freq_u>(?<=m)-.{5})|(?P<freq_o>(?<=H)-.{5})|(?P<freq>\ \d{5}))>
     (<tA\ (?P<temp_ambient>[+-]\d{4})>)? # white space is ignored, so "\ "
     (<tO\ (?P<temp_sky>[+-]\d{4})>)?
@@ -32,7 +33,9 @@ MEASURE_RE = re.compile(br"""
     (<mZ\ (?P<mag_z>[+-]\d{4})>)?
     (?P<counter>\d+)?)?
     \r\n
-    """, re.VERBOSE)
+    """,
+    re.VERBOSE,
+)
 
 
 _logger = logging.getLogger(__name__)
@@ -44,7 +47,8 @@ class TESSConf(PhotometerConf):
 
 class Tess(Device):
     """Generic TESS device"""
-    def __init__(self, name="unknown", model='unknown'):
+
+    def __init__(self, name="unknown", model="unknown"):
         super().__init__(name, model)
         # Get Photometer identification codes
         self.protocol_number = 0
@@ -71,70 +75,73 @@ class Tess(Device):
 
     def process_metadata(self, match):
         if match:
-            return {'cmd': 'i', 'protocol_number': self.protocol_number,
-                    'model_number': self.model_number,
-                    'feature_number': self.feature_number,
-                    'serial_number': self.serial_number}
+            return {
+                "cmd": "i",
+                "protocol_number": self.protocol_number,
+                "model_number": self.model_number,
+                "feature_number": self.feature_number,
+                "serial_number": self.serial_number,
+            }
         else:
-            raise ValueError('process_metadata')
+            raise ValueError("process_metadata")
 
     def process_msg(self, match):
         re_m = match.groupdict()
         # temps
         result = dict()
-        result['cmd'] = 'r'
-        result['freq'] = 0.0
-        result['magnitude'] = 99.0
-        result['name'] = self.name
-        result['model'] = 'TESS'
-        result['freq_sensor'] = 0.0
-        result['valid'] = False
+        result["cmd"] = "r"
+        result["freq"] = 0.0
+        result["magnitude"] = 99.0
+        result["name"] = self.name
+        result["model"] = "TESS"
+        result["freq_sensor"] = 0.0
+        result["valid"] = False
 
-        if re_m['freq_pref'] is None:
+        if re_m["freq_pref"] is None:
             return result
         else:
-            if re_m['freq_o'] is not None:
+            if re_m["freq_o"] is not None:
                 # overflow
                 return result
-            if re_m['freq_u'] is not None:
+            if re_m["freq_u"] is not None:
                 # underflow
                 return result
 
-            if re_m['freq_pref'] == b'm':
-                result['freq'] = int(re_m['freq']) / 1000.0
-            elif re_m['freq_pref'] == b'H':
-                result['freq'] = int(re_m['freq']) / 1.0
+            if re_m["freq_pref"] == b"m":
+                result["freq"] = int(re_m["freq"]) / 1000.0
+            elif re_m["freq_pref"] == b"H":
+                result["freq"] = int(re_m["freq"]) / 1.0
             else:
-                raise ValueError('freq_pref')
-            result['freq_sensor'] = result['freq'] * 1000.0
-            result['magnitude'] = self.calibration - 2.5 * math.log10(result['freq'])
-        acc_keys = ['temp_ambient', 'temp_sky']
+                raise ValueError("freq_pref")
+            result["freq_sensor"] = result["freq"] * 1000.0
+            result["magnitude"] = self.calibration - 2.5 * math.log10(result["freq"])
+        acc_keys = ["temp_ambient", "temp_sky"]
         for key in acc_keys:
             if re_m[key] is not None:
                 result[key] = int(re_m[key]) / 100.0
 
-        acc_keys = ['acc_x', 'acc_y', 'acc_z']
+        acc_keys = ["acc_x", "acc_y", "acc_z"]
 
         for key in acc_keys:
             if re_m[key] is not None:
                 result[key] = int(re_m[key])
 
-        acc_keys = ['mag_x', 'mag_y', 'mag_z']
+        acc_keys = ["mag_x", "mag_y", "mag_z"]
 
         for key in acc_keys:
             if re_m[key] is not None:
                 result[key] = int(re_m[key])
 
-        result['valid'] = True
+        result["valid"] = True
         return result
 
     def check_capabilities(self, match):
 
-        key_f = 'freq_pref'
+        key_f = "freq_pref"
         # flux_keys = ['freq_pref', 'freq_o', 'freq_u', 'freq']
-        temp_keys = ['temp_ambient', 'temp_sky']
-        acc_keys = ['acc_x', 'acc_y', 'acc_z']
-        mag_keys = ['mag_x', 'mag_y', 'mag_z']
+        temp_keys = ["temp_ambient", "temp_sky"]
+        acc_keys = ["acc_x", "acc_y", "acc_z"]
+        mag_keys = ["mag_x", "mag_y", "mag_z"]
 
         capabilities = dict(
             has_flux=False,
@@ -143,18 +150,18 @@ class Tess(Device):
         )
 
         for key in temp_keys:
-            capabilities['has_{}'.format(key)] = False
+            capabilities["has_{}".format(key)] = False
 
         re_m = match.groupdict()
 
         if re_m.get(key_f, None) is not None:
-            capabilities['has_flux'] = True
+            capabilities["has_flux"] = True
 
         for key in temp_keys:
             if re_m.get(key, None) is not None:
-                capabilities['has_{}'.format(key)] = True
-        capabilities['has_acc'] = all(re_m.get(k, None) is not None for k in acc_keys)
-        capabilities['has_mag'] = all(re_m.get(k, None) is not None for k in mag_keys)
+                capabilities["has_{}".format(key)] = True
+        capabilities["has_acc"] = all(re_m.get(k, None) is not None for k in acc_keys)
+        capabilities["has_mag"] = all(re_m.get(k, None) is not None for k in mag_keys)
 
         return capabilities
 
@@ -165,30 +172,30 @@ class Tess(Device):
         # we have to average
         # tstamp, freq, freq_sensor, magnitude
         # magnitude corresponds to the mag of the average freq
-        if any([p['freq'] <= 0 for p in payloads]):
+        if any([p["freq"] <= 0 for p in payloads]):
             # FIXME: over/underflow
-            result['freq'] = result['freq_sensor'] = 0
-            result['magnitude'] = 99.0
+            result["freq"] = result["freq_sensor"] = 0
+            result["magnitude"] = 99.0
         else:
-            for key in ['freq_sensor']:
+            for key in ["freq_sensor"]:
                 result[key] = sum(p[key] for p in payloads) / npayloads
             # print(result['freq'])
             # print([p['freq'] <= 0 for p in payloads])
             # print(any([p['freq'] <= 0 for p in payloads]))
-            result['freq'] = result['freq_sensor'] / 1000.0
-            result['magnitude'] = self.calibration - 2.5 * math.log10(result['freq'])
+            result["freq"] = result["freq_sensor"] / 1000.0
+            result["magnitude"] = self.calibration - 2.5 * math.log10(result["freq"])
 
         # average times
-        ts0 = payloads[0]['tstamp']
-        ts = [(p['tstamp'] - ts0) for p in payloads]
-        result['tstamp'] = ts0 + sum(ts, datetime.timedelta(0)) / npayloads
+        ts0 = payloads[0]["tstamp"]
+        ts = [(p["tstamp"] - ts0) for p in payloads]
+        result["tstamp"] = ts0 + sum(ts, datetime.timedelta(0)) / npayloads
         return result
 
     def process_calibration(self, match):
         if match:
-            return {'cmd': 'c', 'calibration': self.calibration}
+            return {"cmd": "c", "calibration": self.calibration}
         else:
-            raise ValueError('process_calibration')
+            raise ValueError("process_calibration")
 
     def start_connection(self):
         pass
@@ -198,10 +205,10 @@ class Tess(Device):
 
     def reset_device(self):
         """Restart connection"""
-        _logger.debug('reset device')
+        _logger.debug("reset device")
         self.close_connection()
         self.start_connection()
-        _logger.debug('reset done')
+        _logger.debug("reset done")
 
     def read_metadata(self, tries=1):
         """Read the serial number, firmware version."""
@@ -216,15 +223,15 @@ class Tess(Device):
             match = MEASURE_RE.match(msg)
             if match:
                 # check capabilities
-                logger.debug('metadata is %s', msg)
+                logger.debug("metadata is %s", msg)
                 self.check_capabilities(match)
                 return msg
             else:
-                logger.warning('malformed data, ignoring %s', msg)
-                logger.debug('data is %s', msg)
+                logger.warning("malformed data, ignoring %s", msg)
+                logger.debug("data is %s", msg)
                 this_try += 1
 
-        msg = 'reading data after {} tries'.format(tries)
+        msg = "reading data after {} tries".format(tries)
         logger.error(msg)
         raise ValueError(msg)
 
@@ -245,20 +252,20 @@ class Tess(Device):
             logger.debug("msg is %s", msg)
             match = MEASURE_RE.match(msg)
             if match:
-                logger.debug('process data')
+                logger.debug("process data")
                 pmsg = self.process_msg(match)
-                logger.debug('data is %s', pmsg)
+                logger.debug("data is %s", pmsg)
                 return pmsg
             else:
-                logger.warning('malformed data, ignoring %s', msg)
-                logger.debug('data is %s', msg)
+                logger.warning("malformed data, ignoring %s", msg)
+                logger.debug("data is %s", msg)
                 this_try += 1
                 time.sleep(self.cmd_wait)
                 self.reset_device()
                 time.sleep(self.cmd_wait)
                 return None
 
-        msg = 'reading data after {} tries'.format(tries)
+        msg = "reading data after {} tries".format(tries)
         logger.error(msg)
         raise ValueError(msg)
 
@@ -266,19 +273,19 @@ class Tess(Device):
         pass
 
     def read_msg(self):
-        return b''
+        return b""
 
 
 class TessR(Tess):
     def __init__(self, conn, name="tess", sleep_time=1, tries=10):
-        super().__init__(name=name, model='TESS-R')
+        super().__init__(name=name, model="TESS-R")
         self.serial = conn
         # Clearing buffer
         self.read_msg()
 
     def start_connection(self):
         """Start photometer connection"""
-        _logger.debug('start connection')
+        _logger.debug("start connection")
         if not self.serial.is_open:
             self.serial.open()
 
@@ -289,7 +296,7 @@ class TessR(Tess):
     def close_connection(self):
         """End photometer connection"""
         # Check until there is no answer from device
-        _logger.debug('close connection')
+        _logger.debug("close connection")
         self.serial.close()
 
     def read_msg(self):
@@ -321,15 +328,16 @@ class TessV2(Tess):
 
 
     """
+
     def __init__(self, conn, name="tess", sleep_time=1, tries=10):
-        super().__init__(name=name, model='TESSv2')
+        super().__init__(name=name, model="TESSv2")
         self.serial = conn
         # Clearing buffer
         self.read_msg()
 
     def close_connection(self):
         """End photometer connection"""
-        _logger.debug('close connection')
+        _logger.debug("close connection")
         self.serial.close()
 
     def read_msg(self):
@@ -368,9 +376,9 @@ class TessV2(Tess):
                 res = None
             # Sometimes it returns numbers, not dicts
             if res and isinstance(res, dict):
-                logger.debug('process message')
+                logger.debug("process message")
                 pmsg = self.process_msg(res)
-                logger.debug(f'processed data is {pmsg}')
+                logger.debug(f"processed data is {pmsg}")
                 return pmsg
             else:
                 # We expect several non-json messages between correct msgs
@@ -378,7 +386,7 @@ class TessV2(Tess):
                 # this_try += 1
                 return None
 
-        msg = f'unable to read data after {tries} tries'
+        msg = f"unable to read data after {tries} tries"
         logger.error(msg)
         raise ValueError(msg)
 
@@ -388,30 +396,32 @@ class TessV2(Tess):
         # Convert whatever we read from the photometer
         # to a unified format
         payload = dict()
-        payload['model'] = 'TESSv2'
-        payload['cmd'] = 'r'
-        payload['protocol_revision'] = 2
-        payload['zero_point'] = self.calibration
-        payload['name'] = self.name
+        payload["model"] = "TESSv2"
+        payload["cmd"] = "r"
+        payload["protocol_revision"] = 2
+        payload["zero_point"] = self.calibration
+        payload["name"] = self.name
 
-        msg_zp = res.get('ZP')
+        msg_zp = res.get("ZP")
         if self.calibration != msg_zp:
-            msg = "Calibration values don't agree: self:{} payload:{}".format(self.calibration, msg_zp)
+            msg = "Calibration values don't agree: self:{} payload:{}".format(
+                self.calibration, msg_zp
+            )
             warnings.warn(msg, RuntimeWarning)
 
-        msg_rev = res.get('rev')
+        msg_rev = res.get("rev")
         if msg_rev != 2:
             msg = "Protocol values don't agree: self:{} payload:{}".format(2, msg_rev)
             warnings.warn(msg, RuntimeWarning)
 
         # Actual lectures from the photometer
-        payload['freq_sensor'] = res.get('freq')  # Actual measurement, in Hz
-        payload['magnitude'] = res.get('mag')
-        payload['temp_ambient'] = res.get('tamb')
-        payload['temp_sky'] = res.get('tsky')
+        payload["freq_sensor"] = res.get("freq")  # Actual measurement, in Hz
+        payload["magnitude"] = res.get("mag")
+        payload["temp_ambient"] = res.get("tamb")
+        payload["temp_sky"] = res.get("tsky")
 
         # Add time information
         # Complete the payload with tstamp and TZ
         now = datetime.datetime.utcnow()
-        payload['tstamp'] = now
+        payload["tstamp"] = now
         return payload
