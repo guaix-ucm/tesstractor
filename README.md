@@ -16,4 +16,3 @@ or (at your option) any later version. See the file LICENSE.txt for details.
 
 Webpage: https://github.com/guaix-ucm/tesstractor
 Maintainer: sergiopr@fis.ucm.es
-

@@ -33,4 +33,3 @@
 # UTC Date & Time, Local Date & Time, Temperature, Sky Temperature, Frequency, MSAS, ZP
 # YYYY-MM-DDTHH:mm:ss.fff;YYYY-MM-DDTHH:mm:ss.fff;Celsius;Celsius;Hz;mag/arcsec^2;mag/arcsec^2
 # END OF HEADER
-
