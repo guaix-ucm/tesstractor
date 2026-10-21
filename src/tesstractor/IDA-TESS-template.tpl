@@ -13,9 +13,9 @@
 # Moving / Fixed look direction: FIXED
 # Number of channels: 1
 # Filters per channel: {instrument.filter}
-# Measurement direction per channel: {instrument.azimuth}, 90.0 - {instrument.altitude}
+# Measurement direction per channel: {instrument.azimuth}, {instrument.zenith}
 # Field of view: {instrument.fov}
-# Number of fields per line: 6
+# Number of fields per line: 7
 # TESS MAC address: {instrument.mac_address}
 # TESS firmware version: {instrument.firmware}
 # TESS cover offset value: {instrument.cover_offset}

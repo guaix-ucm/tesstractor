@@ -29,9 +29,6 @@ class Device:
         """Read the photometer"""
         pass
 
-    def process_message(self, msg):
-        pass
-
     def process_msg(self, msg):
         pass
 
@@ -75,3 +72,8 @@ class PhotometerConf:
     ix_readout = ""
     rx_readout = ""
     cx_readout = ""
+
+    @property
+    def zenith(self):
+        """Zenith angle of the measurement direction"""
+        return 90.0 - self.altitude

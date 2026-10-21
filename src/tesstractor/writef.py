@@ -82,7 +82,8 @@ def init_file(filename, insconf, locconf):
     template_string = tmpl_b.decode("utf-8")
     with open(filename, "w") as fd:
         sus = template_string.format(instrument=insconf, location=locconf)
-        print(sus[:-1], end="", file=fd)
+        # The data lines start after the header
+        print(sus.rstrip("\n"), file=fd)
 
 
 def startup(time_interval, name, dirname):
@@ -109,7 +110,7 @@ def startup(time_interval, name, dirname):
             # This file is in the future, weird:
             continue
 
-        if time_interval.in_oc(dt):
+        if time_interval.in_co(dt):
             create = False
             filename = fname
             break

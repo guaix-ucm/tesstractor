@@ -27,14 +27,14 @@ def meta_as_type(key, conv):
 
 
 def position_converter(value, meta):
-    """Convert longitude, latitude, height in file header"""
+    """Convert latitude, longitude, height in file header"""
     vals = [float(val) for val in value.split(",")]
 
     if len(vals) < 3:
-        raise ValueError('"longitude, latitude, height" is needed')
+        raise ValueError('"latitude, longitude, height" is needed')
 
-    meta["lon"] = vals[0] * u.deg
-    meta["lat"] = vals[1] * u.deg
+    meta["lat"] = vals[0] * u.deg
+    meta["lon"] = vals[1] * u.deg
     meta["height"] = vals[2] * u.m
 
 
@@ -115,11 +115,9 @@ class IDAHeader(astropy.io.ascii.basic.BasicHeader):
 
 class IDAData(astropy.io.ascii.BaseData):
     def process_lines(self, lines):
-        lc = 0
-        MAX_LC = 35
+        # Data lines are those not in the header
         for line in lines:
-            lc += 1
-            if lc > MAX_LC:
+            if line.strip() and not line.startswith("#"):
                 yield line
 
 
