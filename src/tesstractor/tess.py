@@ -96,7 +96,7 @@ class Tess(Device):
         result["freq_sensor"] = 0.0
         result["zero_point"] = self.calibration
         result["valid"] = False
-        result["tstamp"] = datetime.datetime.utcnow()
+        result["tstamp"] = datetime.datetime.now(datetime.UTC)
 
         if re_m["freq_pref"] is None:
             return result
@@ -402,5 +402,5 @@ class TessV2(Tess):
                 payload[key] = res[msg_key]
 
         # Add time information
-        payload["tstamp"] = datetime.datetime.utcnow()
+        payload["tstamp"] = datetime.datetime.now(datetime.UTC)
         return payload

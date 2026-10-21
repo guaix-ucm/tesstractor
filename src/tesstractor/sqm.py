@@ -135,7 +135,7 @@ class SQM(Device):
         result["valid"] = True
         # Add time information
         # Complete the payload with tstamp
-        result["tstamp"] = datetime.datetime.utcnow()
+        result["tstamp"] = datetime.datetime.now(datetime.UTC)
         return result
 
     def process_calibration(self, match):

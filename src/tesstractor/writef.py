@@ -13,9 +13,6 @@ import pkgutil
 import datetime
 import glob
 import os.path
-import queue
-
-import pytz
 
 _logger = logging.getLogger(__name__)
 
@@ -127,89 +124,73 @@ def startup(time_interval, name, dirname):
     return create, filename
 
 
-def consumer_write_file(intput_q: queue.Queue, config):
-    """Thread to manage file writing"""
-    _logger.info("starting file writer consumer")
+class FileSink:
+    """Write measurements of a photometer to daily IDA files"""
 
-    # Open the correct file, create a new one if
-    # it doesn't exist
-    ref_dt = datetime.datetime.now()
-    _logger.debug("current local time, %s", ref_dt)
-    # directory with logs
+    def __init__(self, dirname, devconf, location, local_tz):
+        self.dirname = dirname
+        self.devconf = devconf
+        self.location = location
+        self.local_tz = local_tz
+        self.rot = TimedDailyRotator(when=datetime.time(hour=12, minute=0, second=0))
+        self.valid_fname = None
+        self.next_change = None
 
-    _logger.debug("directory with previous files, %s", config.dirname)
+    def open(self):
+        """Open the correct file, create a new one if it doesn't exist"""
+        _logger.info("starting file writer of %s in %s", self.devconf.name, self.dirname)
+        os.makedirs(self.dirname, exist_ok=True)
 
-    _logger.debug("interval of valid logs")
-    rot = TimedDailyRotator(when=datetime.time(hour=12, minute=0, second=0))
-    valid_inter = rot.in_interval(ref_dt)
+        ref_dt = datetime.datetime.now(self.local_tz).replace(tzinfo=None)
+        _logger.debug("current local time, %s", ref_dt)
 
-    last_change = valid_inter.min_val
-    next_change = valid_inter.max_val
-    _logger.debug("from %s upto %s", last_change, next_change)
+        valid_inter = self.rot.in_interval(ref_dt)
+        self.next_change = valid_inter.max_val
+        _logger.debug("interval of valid logs from %s upto %s", valid_inter.min_val, valid_inter.max_val)
 
-    insconf = config.devconf
-
-    create, valid_fname = startup(valid_inter, insconf.name, config.dirname)
-
-    if create:
-        valid_fname = calc_filename(ref_dt, name=insconf.name)
-        _logger.debug("valid file not found")
-        _logger.debug("create %s", valid_fname)
-        init_file(os.path.join(config.dirname, valid_fname), insconf, config.location)
-    else:
-        _logger.debug("valid file is %s", valid_fname)
-
-    while True:
-        _logger.debug("enter thread loop")
-        payload = intput_q.get()
-        if payload:
-            # We are not going to write this to file anyway
-            if payload["cmd"] == "id":
-                continue
-
-            _logger.debug(f"got (w) payload {payload}")
-            # Add local time to payload
-            payload = update_p(payload)
-            #
-            # Verify the file is correct before writing
-            # if not, create a new one
-            now_local = payload["tstamp_local"]
-            now_local_n = now_local.replace(tzinfo=None)
-            if now_local_n >= next_change:
-                _logger.debug("read time is after scheduled time change")
-                _logger.debug("create new file")
-                _logger.debug("compute next change")
-                valid_inter = rot.in_interval(now_local_n)
-                next_change = valid_inter.max_val
-                valid_fname = calc_filename(now_local_n, name=insconf.name)
-                init_file(os.path.join(config.dirname, valid_fname), insconf, config.location)
-            _logger.debug("write to file")
-            write_to_file(payload, config.dirname, valid_fname)
-            intput_q.task_done()
+        create, valid_fname = startup(valid_inter, self.devconf.name, self.dirname)
+        if create:
+            valid_fname = calc_filename(ref_dt, name=self.devconf.name)
+            _logger.debug("valid file not found, create %s", valid_fname)
+            init_file(os.path.join(self.dirname, valid_fname), self.devconf, self.location)
         else:
-            _logger.info("end file writer consumer thread")
-            # other.client.loop_stop()
-            break
+            _logger.debug("valid file is %s", valid_fname)
+        self.valid_fname = valid_fname
+
+    async def send(self, payload):
+        """Write payload to the file"""
+        # We are not going to write this to file anyway
+        if payload["cmd"] == "id":
+            return
+
+        _logger.debug("got (w) payload %s", payload)
+        # Add local time to payload
+        payload = update_p(dict(payload))
+        # Verify the file is correct before writing
+        # if not, create a new one
+        now_local_n = payload["tstamp_local"].replace(tzinfo=None)
+        if now_local_n >= self.next_change:
+            _logger.debug("read time is after scheduled time change, create new file")
+            valid_inter = self.rot.in_interval(now_local_n)
+            self.next_change = valid_inter.max_val
+            self.valid_fname = calc_filename(now_local_n, name=self.devconf.name)
+            init_file(os.path.join(self.dirname, self.valid_fname), self.devconf, self.location)
+        write_to_file(payload, self.dirname, self.valid_fname)
 
 
 def update_p(payload):
     """Update payload with tstamp_local"""
-    now = payload["tstamp"]
-    local_tz = payload["localtz"]
-    now_utc = pytz.utc.localize(now)
-    now_local = now_utc.astimezone(local_tz)
-    payload["tstamp_local"] = now_local
+    payload["tstamp_local"] = payload["tstamp"].astimezone(payload["localtz"])
     return payload
 
 
 def write_to_file(payload, dirname, filename):
     """Write payload to file"""
-    payload["tstamp_str"] = payload["tstamp"].isoformat("T", timespec="milliseconds")
+    payload["tstamp_str"] = payload["tstamp"].replace(tzinfo=None).isoformat("T", timespec="milliseconds")
     payload["tstamp_local_str"] = payload["tstamp_local"].replace(tzinfo=None).isoformat("T", timespec="milliseconds")
-    # m.isoformat('T', timespec='milliseconds')
     line_tpl = (
         "{tstamp_str};{tstamp_local_str};{temp_ambient:.2f};"
-        "{temp_sky:.2f};{freq_sensor};{magnitude:.2f};{zero_point}"
+        "{temp_sky:.2f};{freq_sensor:.3f};{magnitude:.2f};{zero_point}"
     )
     with open(os.path.join(dirname, filename), "a") as fd:
         if payload["cmd"] == "r":

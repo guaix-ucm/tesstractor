@@ -7,49 +7,24 @@
 # License-Filename: LICENSE.txt
 #
 
-import threading
-import queue
+import asyncio
 import signal
 import logging
 import argparse
 import configparser
+import pkgutil
 import sys
-from typing import List
 
 import serial
 import attr
 import pytz
 
 from tesstractor.sqm import SQMTest, SQMLU
-
-# from tesstractor.tess import Tess
+from tesstractor.tess import TessR, TessV2
 from tesstractor.device import Device
-import tesstractor.mqtt as mqtt
-import tesstractor.writef
-import tesstractor.tess
-from tesstractor.workers import (
-    splitter,
-    simple_buffer,
-    periodic_avg_task,
-    read_photometer_timed,
-)
-
-
-def signal_handler_function(signum, frame, exit_event):
-    """Communicate a exit event.
-
-    All threads must finish
-    """
-    exit_event.set()
-
-
-class Conf:
-    pass
-
-
-class OtherConf:
-    pass
-
+from tesstractor.mqtt import MqttSink
+from tesstractor.writef import FileSink
+from tesstractor.workers import QUEUE_MAXSIZE, read_photometer, periodic_average
 
 ini_defaults = {
     "provider": {"contact_name": "unknown", "organization": "unknown"},
@@ -66,6 +41,15 @@ ini_defaults = {
         "timezone": "UTC",
         "timesync": "unknown",
     },
+}
+
+# Fields of the instrument configuration that can be set in the ini file
+_instrument_keys = {
+    "filter": str,
+    "azimuth": float,
+    "altitude": float,
+    "fov": float,
+    "cover_offset": float,
 }
 
 
@@ -89,12 +73,9 @@ class LocationConf:
 def build_location_from_ini(conf) -> LocationConf:
     """Create a locationConf from the configuration"""
     location_sec = conf["location"]
-
-    loc = LocationConf()
-    for key in location_sec:
-        setattr(loc, key, location_sec[key])
-
-    return loc
+    fields = attr.fields_dict(LocationConf)
+    kwargs = {key: location_sec[key] for key in location_sec if key in fields}
+    return LocationConf(**kwargs)
 
 
 def build_dev_from_ini(section) -> Device:
@@ -103,56 +84,43 @@ def build_dev_from_ini(section) -> Device:
 
     model = section.get("model", "SQM-TEST")
     logger.debug("model is %s", model)
+    name = section.get("name")
+    port = section.get("port", "/dev/ttyUSB0")
     if model == "SQM-TEST":
         return SQMTest()
     elif model == "SQM-LU":
-        name = section.get("name")
-        port = section.get("port", "/dev/ttyUSB0")
         baudrate = section.getint("baudrate", 115200)
         timeout = section.getfloat("timeout", 2.0)
         conn = serial.Serial(port, baudrate, timeout=timeout)
         photo_dev = SQMLU(conn, name)
-        mac = section.get("mac")
-        if mac:
-            photo_dev.mac = mac
-        return photo_dev
-    elif model in ["TESS-R", "TESS", "TESS-U"]:
-        name = section.get("name")
-        port = section.get("port", "/dev/ttyUSB0")
+    elif model in ["TESS-R", "TESS", "TESS-U", "TESSv2"]:
         baudrate = section.getint("baudrate", 9600)
         timeout = section.getfloat("timeout", 1.0)
         conn = serial.Serial(port, baudrate, timeout=timeout)
         if name is None:
             logger.warning("name is none, this should be automatic")
             name = "TESS-test"
-
-        photo_dev = tesstractor.tess.TessR(conn, name)
-        zero_point = section.getfloat("zero_point", 20.0)
-        photo_dev.calibration = zero_point
-        mac = section.get("mac")
-        if mac:
-            photo_dev.mac = mac
-
-    elif model in ["TESSv2"]:
-        name = section.get("name")
-        port = section.get("port", "/dev/ttyUSB0")
-        baudrate = section.getint("baudrate", 9600)
-        timeout = section.getfloat("timeout", 1.0)
-        conn = serial.Serial(port, baudrate, timeout=timeout)
-        if name is None:
-            logger.warning("name is none, this should be automatic")
-            name = "TESS-test"
-
-        photo_dev = tesstractor.tess.TessV2(conn, name)
-        zero_point = section.getfloat("zero_point", 20.0)
-        photo_dev.calibration = zero_point
-        mac = section.get("mac")
-        if mac:
-            photo_dev.mac = mac
-
-        return photo_dev
+        if model == "TESSv2":
+            photo_dev = TessV2(conn, name)
+        else:
+            photo_dev = TessR(conn, name)
+        photo_dev.calibration = section.getfloat("zero_point", 20.0)
     else:
-        raise ValueError("unkown model {}".format(model))
+        raise ValueError("unknown model {}".format(model))
+
+    mac = section.get("mac")
+    if mac:
+        photo_dev.mac = mac
+    return photo_dev
+
+
+def static_conf_from_ini(device: Device, section):
+    """Configuration of the instrument, with values from the configuration"""
+    conf = device.static_conf()
+    for key, conv in _instrument_keys.items():
+        if key in section:
+            setattr(conf, key, conv(section[key]))
+    return conf
 
 
 def readerconf_from_ini(section):
@@ -162,89 +130,70 @@ def readerconf_from_ini(section):
     return readerconf
 
 
-def create_mqtt_workers(q_worker: queue.Queue, mqtt_config) -> List[threading.Thread]:
-    """Create MQTT workers"""
-    otherx = OtherConf()
-    # otherx.send_event = send_event
-
-    q_mqtt_in = queue.Queue()  # Queue for MQTT
-    q_buffer = queue.Queue()  # Queue for MQTT buffer
-
-    filter_thread = threading.Thread(
-        target=simple_buffer,
-        name="simple_filter_mqtt",
-        args=(q_worker, q_mqtt_in, q_buffer, otherx),
-    )
-
-    interval = mqtt_config.getfloat("interval", 60.0)
-    other_mqtt = mqtt.MqttConsumer(mqtt_config)
-    consumer_mqtt = threading.Thread(target=mqtt.consumer_mqtt, name="mqtt_consumer", args=(q_mqtt_in, other_mqtt))
-
-    send_event = None
-    timed_buffer = threading.Timer(interval, periodic_avg_task, args=(q_buffer, q_mqtt_in, send_event))
-    timed_buffer.name = "timed_buffer_mqtt"
-
-    filter_thread.start()
-    timed_buffer.start()
-    consumer_mqtt.start()
-
-    return [filter_thread, consumer_mqtt]
+def enabled_sections(cparser, prefix):
+    """Sections starting with prefix, that are enabled"""
+    logger = logging.getLogger(__name__)
+    result = []
+    for sec_name in cparser.sections():
+        if sec_name.startswith(prefix):
+            if cparser[sec_name].getboolean("enabled", True):
+                result.append(cparser[sec_name])
+            else:
+                logger.info("section %s disabled", sec_name)
+    return result
 
 
-def create_file_writer_workers(q_worker: queue.Queue, file_config: OtherConf) -> List[threading.Thread]:
+async def run_service(cparser, photometers, loc_conf):
+    """Read the photometers and send the measurements to files and MQTT servers.
 
-    otherx = OtherConf()
-    q_file_in = queue.Queue()  # Queue for file writer
-    q_buffer = queue.Queue()  # Queue for file writer buffer
-    send_event = None
+    Ends when SIGTERM or SIGINT are received. If any task fails,
+    the rest are cancelled and the exception is raised.
+    """
+    logger = logging.getLogger(__name__)
+    loc_tz = pytz.timezone(loc_conf.timezone)
 
-    # This thread splits messages
-    # cmd="ID" are sent directly to writer (q_file_in)
-    # cmd="R" are sent to a buffer (q_buffer)
-    filter_thread = threading.Thread(
-        target=simple_buffer,
-        name="simple_filter_file",
-        args=(q_worker, q_file_in, q_buffer, otherx),
-    )
+    stop = asyncio.Event()
+    loop = asyncio.get_running_loop()
+    for signum in [signal.SIGTERM, signal.SIGINT]:
+        loop.add_signal_handler(signum, stop.set)
 
-    # This Timer thread wakes up periodically and averages values in (q_buffer)
-    # After that, the average is sent to writer queue (q_file_in)
-    interval = file_config.interval
-    timed_buffer = threading.Timer(interval, periodic_avg_task, args=(q_buffer, q_file_in, send_event))
-    timed_buffer.name = "timed_buffer_file"
+    # Read metadata and calibration
+    await asyncio.gather(*(asyncio.to_thread(dev.start_connection) for dev, _, _ in photometers))
 
-    # This thread writes the values in writer queue (q_file_in)
-    consumer_file = threading.Thread(
-        target=tesstractor.writef.consumer_write_file,
-        name="consumer_write_file",
-        args=(q_file_in, file_config),
-    )
+    mqtt_sinks = []
+    for sec in enabled_sections(cparser, "mqtt"):
+        logger.info("creating MQTT connection with %s", sec["hostname"])
+        mqtt_sinks.append((MqttSink(sec), sec.getfloat("interval", 60.0)))
 
-    consumer_file.start()
-    filter_thread.start()
-    timed_buffer.start()
+    file_secs = enabled_sections(cparser, "file")
 
-    return [filter_thread, consumer_file]
+    async with asyncio.TaskGroup() as tg:
+        for sink, _ in mqtt_sinks:
+            tg.create_task(sink.run())
+
+        async with asyncio.TaskGroup() as producers:
+            for dev, readerconf, dev_sec in photometers:
+                sinks = [(sink, interval) for sink, interval in mqtt_sinks]
+                for sec in file_secs:
+                    sink = FileSink(sec.get("dirname"), static_conf_from_ini(dev, dev_sec), loc_conf, loc_tz)
+                    sink.open()
+                    sinks.append((sink, sec.getfloat("interval", 300.0)))
+
+                queues = []
+                for sink, interval in sinks:
+                    q = asyncio.Queue(maxsize=QUEUE_MAXSIZE)
+                    queues.append(q)
+                    producers.create_task(periodic_average(q, sink, interval))
+
+                readerconf["tz"] = loc_tz
+                producers.create_task(read_photometer(dev, queues, readerconf, stop))
+
+        # Readers have ended, send pending messages
+        for sink, _ in mqtt_sinks:
+            await sink.close()
 
 
 def main(args=None):
-    # Register events and signal
-    exit_event = threading.Event()
-    error_event = threading.Event()
-    send_event = threading.Event()
-
-    exit_code = 0
-
-    send_event.clear()
-
-    def signal_handler(signum, frame):
-        return signal_handler_function(signum, frame, exit_event)
-
-    # On SIGTERM, set exit_event
-    signal.signal(signal.SIGTERM, signal_handler)
-    # On SIGINT, set exit_event
-    signal.signal(signal.SIGINT, signal_handler)
-
     # Parse CLI
     parser = argparse.ArgumentParser()
     parser.add_argument("--dirname")
@@ -253,7 +202,7 @@ def main(args=None):
     parser.add_argument(
         "--log",
         default="INFO",
-        choices=["DEBUG", "INFO", "WARNING", "ERROR", "CRTICAL", "NOTSET"],
+        choices=["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL", "NOTSET"],
     )
 
     pargs = parser.parse_args(args=args)
@@ -266,8 +215,6 @@ def main(args=None):
 
     if pargs.generate_config:
         # write the default config file
-        import pkgutil
-
         data = pkgutil.get_data("tesstractor", "base.ini")
         print(data.decode("utf-8"))
         return 0
@@ -286,115 +233,25 @@ def main(args=None):
     cparser.read_dict(ini_overrides)
 
     loc_conf = build_location_from_ini(cparser)
-    loc_tz = pytz.timezone(loc_conf.timezone)
-    photo_sections = [sec for sec in cparser.sections() if sec.startswith("photometer")]
 
-    photolist = []
-    readerlist = []
-    for secname in photo_sections:
-        section = cparser[secname]
-        if section.getboolean("enabled", True):
-            newdev = build_dev_from_ini(section)
-            newread = readerconf_from_ini(section)
-            newread["tz"] = loc_tz
-            photolist.append(newdev)
-            readerlist.append(newread)
+    photometers = []
+    for section in enabled_sections(cparser, "photometer"):
+        newdev = build_dev_from_ini(section)
+        newread = readerconf_from_ini(section)
+        photometers.append((newdev, newread, section))
 
-    nsqm = len(photolist)
-
-    if nsqm == 0:
+    if not photometers:
         logger.warning("No devices enabled. Exit")
         sys.exit(1)
 
-    # photoconf = []
-    # for photodev in photolist:
-    #    photodev.start_connection()
-    #    photoconf.append(photodev.static_conf())
+    try:
+        asyncio.run(run_service(cparser, photometers, loc_conf))
+    except Exception:
+        logger.exception("tesstractor, ending with error")
+        sys.exit(1)
 
-    # Using first device
-    photo_dev = photolist[0]
-    readerconf = readerlist[0]
-    photo_dev.start_connection()
-
-    # Working queues
-    working_qs = []
-    # joinable threads
-    joinable_threads = []
-
-    # Section for MQTT connections
-    mqtt_sections = [sec for sec in cparser.sections() if sec.startswith("mqtt")]
-    for sec_name in mqtt_sections:
-        logger.info("creating MQTT conection")
-        mqtt_config = cparser[sec_name]
-        if mqtt_config.getboolean("enabled", True):
-            q_w = queue.Queue()
-            ts = create_mqtt_workers(q_w, mqtt_config)
-            working_qs.append(q_w)
-            joinable_threads.extend(ts)
-        else:
-            logger.info("MQTT section %s disabled", sec_name)
-
-    # Section for files
-    file_sections = [sec for sec in cparser.sections() if sec.startswith("file")]
-    for sec_name in file_sections:
-        logger.info("Creating file output")
-        sec = cparser[sec_name]
-        if sec.getboolean("enabled", True):
-            file_config = OtherConf()
-            file_config.dirname = sec.get("dirname", "/var/lib/pysqm")
-            file_config.format = sec.get("format")
-            file_config.interval = sec.getfloat("interval", 300.0)
-            file_config.devconf = photo_dev.static_conf()
-            file_config.location = loc_conf
-
-            q_w = queue.Queue()
-            ts = create_file_writer_workers(q_w, file_config)
-            working_qs.append(q_w)
-            joinable_threads.extend(ts)
-        else:
-            logger.info("file section %s disabled", sec_name)
-
-    # reader queue
-    q_reader = queue.Queue()
-
-    # Send data to workers
-    # basically, write-to-file and mqtt
-    consd = threading.Thread(name="splitter", target=splitter, args=(q_reader, working_qs))
-    consd.start()
-    joinable_threads.append(consd)
-
-    all_readers = []
-
-    # starting only one reader
-    # Preliminary configuration here
-    readerconf["tz"] = pytz.timezone(loc_conf.timezone)
-
-    # This thread ends in exit_event
-    reader = threading.Thread(
-        target=read_photometer_timed,
-        name=f"photo_reader_{photo_dev.name}",
-        args=(photo_dev, q_reader, readerconf, exit_event, error_event),
-    )
-    reader.start()
-    all_readers.append(reader)
-
-    for t in joinable_threads:
-        t.join()
-
-    for t in all_readers:
-        t.join()
-
-    # Ending main thread
-    # Timer threads must be "cancel()" instead
-    for t in threading.enumerate():
-        if isinstance(t, threading.Timer):
-            logger.debug("cancel timer {}".format(t.name))
-            t.cancel()
-
-    if error_event.is_set():
-        exit_code = 1
-
-    sys.exit(exit_code)
+    logger.info("tesstractor, ending")
+    sys.exit(0)
 
 
 if __name__ == "__main__":

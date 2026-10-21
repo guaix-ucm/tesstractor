@@ -26,6 +26,7 @@ def test_tessr_process_msg(msg, freq):
     assert res["temp_ambient"] == 29.87
     assert res["temp_sky"] == 24.81
     assert res["zero_point"] == 20.5
+    assert res["tstamp"].tzinfo is not None
 
 
 def test_tessr_average_keeps_magnitude():

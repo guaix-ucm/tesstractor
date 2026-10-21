@@ -25,19 +25,20 @@ classifiers = [
     "Topic :: Scientific/Engineering :: Astronomy",
 ]
 dependencies = [
+    "aiomqtt>=2",
     "astroplan",
     "astropy",
     "attrs>=17.4.0",
     "matplotlib",
     "numpy",
-    "paho-mqtt",
+    "paho-mqtt>=2",
     "pyserial",
     "pytz",
     "tzlocal",
 ]
 
 [project.optional-dependencies]
-test = ["pytest"]
+test = ["pytest", "pytest-asyncio"]
 docs = ["sphinx"]
 
 
@@ -57,6 +58,7 @@ where = ["src"]
 
 
 [tool.pytest.ini_options]
+asyncio_mode = "auto"
 # filterwarnings = [
 #     "error",
 #]

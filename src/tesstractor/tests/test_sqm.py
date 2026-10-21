@@ -103,3 +103,4 @@ def test_sqmtest():
     dev.start_connection()
     data = dev.read_data()
     assert data["valid"]
+    assert data["tstamp"].tzinfo is not None
