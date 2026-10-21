@@ -63,3 +63,7 @@ target/
 .pydevproject
 # PyCharm
 .idea
+
+# Local configurations, they may contain passwords
+extras/config_*.ini
+extras/config[0-9]*.ini
