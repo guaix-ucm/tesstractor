@@ -146,6 +146,12 @@ def gen_plot(ax, tval, magval, site, ref_day, meta):
     base_time = Time(ref_day.astimezone(pytz.utc))
     if len(tval) > 0:
         ax.plot(tval, magval, "+")
+        # With a single point or a short span, matplotlib
+        # expands the time axis by years
+        span = tval[-1] - tval[0]
+        if span < timedelta(hours=2):
+            middle = tval[0] + span / 2
+            ax.set_xlim(middle - timedelta(hours=1), middle + timedelta(hours=1))
     else:
         t1 = ref_day
         t2 = ref_day + timedelta(seconds=7200)
