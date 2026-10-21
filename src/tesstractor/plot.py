@@ -11,6 +11,7 @@
 import os.path
 import logging
 import argparse
+import sys
 from datetime import datetime, timedelta
 
 import numpy as np
@@ -179,7 +180,13 @@ def gen_plot(ax, tval, magval, site, ref_day, meta):
 
 
 def do_plots_on_dir(dirname):
+    """Plot the data files newer than their plots.
+
+    A file that cannot be plotted does not stop the rest.
+    Return the number of files that failed.
+    """
     logger = logging.getLogger(__name__)
+    failed = 0
 
     data_files = []
     for f in os.listdir(dirname):
@@ -199,10 +206,14 @@ def do_plots_on_dir(dirname):
 
         if tfiled > tfilep:
             logger.debug("%s data older than plot, update", filed)
-
-            plot_file(filed_f, filep_f)
+            try:
+                plot_file(filed_f, filep_f)
+            except Exception:
+                logger.exception("unable to plot %s", filed)
+                failed += 1
         else:
             logger.debug("%s plot older than data, nothing to do", filep)
+    return failed
 
 
 def do_plots_on_file(filename):
@@ -216,6 +227,10 @@ def plot_file(filed_f, filep_f):
 
     with plt.style.context(my_style1):
         fig = plot_table(table_obj)
+        if fig is None:
+            # A new file has only the header until the first measurement
+            _logger.info("%s has no data, not plotted", filed_f)
+            return
         fig.savefig(filep_f)
         plt.close(fig)
 
@@ -281,11 +296,12 @@ def main(args=None):
 
     if os.path.isdir(pargs.path):
         logger.debug("path is dir")
-        do_plots_on_dir(pargs.path)
+        if do_plots_on_dir(pargs.path):
+            return 1
     else:
         logger.debug("path is file")
         do_plots_on_file(pargs.path)
 
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main())
