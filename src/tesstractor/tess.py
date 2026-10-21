@@ -36,6 +36,9 @@ MEASURE_RE = re.compile(
 )
 
 
+# MAC used to register in MQTT if it is not in the configuration
+UNKNOWN_MAC = "01:23:45:67:89:AB"
+
 _logger = logging.getLogger(__name__)
 
 
@@ -53,7 +56,8 @@ class Tess(Device):
         self.model_number = 0
         self.feature_number = 0
 
-        self.mac = "01:23:45:67:89:AB"
+        # Only known if it is in the configuration
+        self.mac = None
         self.cmd_wait = 0
         self.counts = 1
 
@@ -62,14 +66,14 @@ class Tess(Device):
         conf.name = self.serial_number
         conf.model = self.model
         conf.serial_number = self.serial_number
-        conf.firmware = self.feature_number
         conf.zero_point = self.calibration
-        conf.mac_address = self.mac
+        # The TESS does not report its MAC and firmware
+        conf.mac_address = self.mac or ""
         return conf
 
     def register_id(self):
         """ID used for registration"""
-        return self.mac
+        return self.mac or UNKNOWN_MAC
 
     def process_metadata(self, match):
         if match:

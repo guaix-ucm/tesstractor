@@ -1,3 +1,4 @@
+import configparser
 import datetime
 import os
 
@@ -6,8 +7,11 @@ import pytest
 import pytz
 
 import tesstractor.reader  # noqa: F401, registers the IDA format
-from ..cli import LocationConf
+from ..cli import LocationConf, static_conf_from_ini
 from ..sqm import SQMTest
+from ..tess import TessR
+from ..writef import init_file
+from .fakes import StreamSerial
 from ..writef import FileSink, TimedDailyRotator, startup
 from ..workers import avg_device_buffer
 
@@ -28,6 +32,7 @@ async def test_file_sink_roundtrip(tmp_path):
     dev.start_connection()
     conf = dev.static_conf()
     conf.altitude = 80.0
+    conf.azimuth = 0.0
     sink = FileSink(str(tmp_path / "sub"), conf, location(), TZ)
     # The directory is created
     sink.open()
@@ -47,7 +52,6 @@ async def test_file_sink_roundtrip(tmp_path):
     # SQM has no sky temperature, the field is empty
     data_line = content.splitlines()[-1]
     assert data_line.split(";")[2:4] == ["29.90", ""]
-    assert "# SQM cover offset value: -0.11" in content
 
     tab = astropy.table.Table.read(str(tmp_path / "sub" / fname), format="ascii.IDA")
     assert len(tab) == 3
@@ -78,3 +82,36 @@ def test_startup_new_file(tmp_path):
     (tmp_path / "20260101_120000_sqm1.dat").touch()
     create, fname = startup(inter, "sqm1", str(tmp_path))
     assert create
+
+
+def header(tmp_path, conf):
+    fname = tmp_path / "header.dat"
+    init_file(str(fname), conf, location())
+    with open(fname) as fd:
+        lines = fd.read().splitlines()
+    assert len(lines) == 35
+    return lines
+
+
+def test_header_values_not_provided_are_empty(tmp_path):
+    dev = TessR(StreamSerial([]), "tess1")
+    lines = header(tmp_path, dev.static_conf())
+    for key in ["Filters per channel", "Measurement direction per channel", "Field of view"]:
+        assert f"# {key}:" in lines
+    for key in ["TESS MAC address", "TESS firmware version", "TESS cover offset value"]:
+        assert f"# {key}:" in lines
+
+
+def test_header_values_from_configuration(tmp_path):
+    cparser = configparser.ConfigParser()
+    cparser.read_dict(
+        {"photometer": dict(filter="HOYA CM-500", azimuth="0", altitude="90", fov="20", cover_offset="-0.11")}
+    )
+    dev = SQMTest()
+    dev.start_connection()
+    lines = header(tmp_path, static_conf_from_ini(dev, cparser["photometer"]))
+    assert "# Filters per channel: HOYA CM-500" in lines
+    assert "# Measurement direction per channel: 0.0, 0.0" in lines
+    assert "# Field of view: 20.0" in lines
+    assert "# SQM cover offset value: -0.11" in lines
+    assert "# SQM firmware version: 23" in lines

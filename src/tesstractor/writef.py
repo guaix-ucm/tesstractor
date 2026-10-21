@@ -79,8 +79,10 @@ def init_file(filename, insconf, locconf):
     template_string = tmpl_b.decode("utf-8")
     with open(filename, "w") as fd:
         sus = template_string.format(instrument=insconf, location=locconf)
+        # Empty values leave trailing spaces
+        header = "\n".join(line.rstrip() for line in sus.splitlines())
         # The data lines start after the header
-        print(sus.rstrip("\n"), file=fd)
+        print(header, file=fd)
 
 
 def startup(time_interval, name, dirname):

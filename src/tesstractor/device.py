@@ -97,22 +97,30 @@ class Device:
 
 
 class PhotometerConf:
-    name = "somename"
-    model = "somemodel"
-    serial_number = 1
-    mac_address = "01:23:45:67:89:AB"
-    filter = "b"
-    azimuth = 0.0
-    altitude = 0.0
-    fov = 20
-    firmware = 29
-    cover_offset = -0.11
-    zero_point = 29
+    """Instrument description written in the file header.
+
+    Values not provided by the device or the configuration are
+    left empty, as in the NSBM standard.
+    """
+
+    name = ""
+    model = ""
+    serial_number = ""
+    mac_address = ""
+    filter = ""
+    azimuth = None
+    altitude = None
+    fov = ""
+    firmware = ""
+    cover_offset = ""
+    zero_point = ""
     ix_readout = ""
     rx_readout = ""
     cx_readout = ""
 
     @property
-    def zenith(self):
-        """Zenith angle of the measurement direction"""
-        return 90.0 - self.altitude
+    def direction(self):
+        """Measurement direction, zenith angle and azimuth"""
+        if self.azimuth is None or self.altitude is None:
+            return ""
+        return f"{90.0 - self.altitude}, {self.azimuth}"

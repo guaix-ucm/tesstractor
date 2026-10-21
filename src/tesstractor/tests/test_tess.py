@@ -2,7 +2,7 @@ import math
 
 import pytest
 
-from ..tess import MEASURE_RE, TessR, TessV2
+from ..tess import MEASURE_RE, UNKNOWN_MAC, TessR, TessV2
 from ..workers import avg_device_buffer
 from .fakes import StreamSerial
 
@@ -75,3 +75,13 @@ def test_tessr_line_in_pieces():
     assert res["freq_sensor"] == 4606.0
     assert res["temp_ambient"] == 29.87
     assert dev.read_data(tries=3)["freq_sensor"] == 4607.0
+
+
+def test_tess_mac():
+    dev = TessR(StreamSerial([]), "tess1")
+    # Not in the header if unknown, but needed to register in MQTT
+    assert dev.static_conf().mac_address == ""
+    assert dev.register_id() == UNKNOWN_MAC
+    dev.mac = "AA:BB:CC:DD:EE:FF"
+    assert dev.static_conf().mac_address == "AA:BB:CC:DD:EE:FF"
+    assert dev.register_id() == "AA:BB:CC:DD:EE:FF"
