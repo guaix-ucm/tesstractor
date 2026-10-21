@@ -6,7 +6,7 @@ import signal
 
 import pytest
 
-from ..cli import main, build_location_from_ini, run_service, build_dev_from_ini, readerconf_from_ini
+from ..cli import main, build_location_from_ini, run_service, build_dev_from_ini, readerconf_from_ini, error_summary
 
 
 def test_config(capsys):
@@ -34,7 +34,7 @@ def test_unknown_model():
         build_dev_from_ini(cparser["photometer"])
 
 
-async def run_with_file(tmp_path, interval):
+async def run_with_file(tmp_path, interval, fail_after=None):
     """Run the service with SQM-TEST for a while, return the data lines of the file"""
     cparser = configparser.ConfigParser()
     cparser.read_dict(
@@ -45,6 +45,18 @@ async def run_with_file(tmp_path, interval):
         }
     )
     dev = build_dev_from_ini(cparser["photometer"])
+    if fail_after is not None:
+        # The device is disconnected after fail_after readings
+        good_read_data = dev.read_data
+        readings = []
+
+        def read_data(tries=1):
+            if len(readings) >= fail_after:
+                raise OSError("device disconnected")
+            readings.append(1)
+            return good_read_data(tries)
+
+        dev.read_data = read_data
     photometers = [(dev, readerconf_from_ini(cparser["photometer"]), cparser["photometer"])]
     loc = build_location_from_ini(cparser)
 
@@ -79,3 +91,27 @@ async def test_run_service_without_averaging(tmp_path):
 async def test_run_service_negative_interval(tmp_path):
     with pytest.raises(ValueError, match="interval"):
         await run_with_file(tmp_path, "-1")
+
+
+def test_error_summary():
+    error = OSError(5, "Input/output error")
+    error.add_note("photometer sqm1")
+    group = ExceptionGroup("tasks", [ExceptionGroup("producers", [error]), ValueError("bad interval")])
+    assert error_summary(group) == ("photometer sqm1: OSError: [Errno 5] Input/output error; ValueError: bad interval")
+
+
+@pytest.mark.parametrize("fail_after", [0, 3])
+async def test_run_service_names_failed_photometer(tmp_path, fail_after):
+    # Fails in start_connection (0) or while reading (3)
+    with pytest.raises(Exception) as excinfo:
+        await run_with_file(tmp_path, "0", fail_after=fail_after)
+    assert error_summary(excinfo.value) == "photometer sqmtest: OSError: device disconnected"
+
+
+def test_main_missing_port(tmp_path, caplog):
+    config = tmp_path / "config.ini"
+    config.write_text("[photometer]\nmodel: SQM-LU\nport: /dev/does-not-exist\n")
+    with pytest.raises(SystemExit) as excinfo:
+        main(["-c", str(config)])
+    assert excinfo.value.code == 1
+    assert "ending with error: section photometer: SerialException: [Errno 2] could not open port" in caplog.text

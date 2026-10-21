@@ -110,6 +110,10 @@ async def read_photometer(
                 await asyncio.wait_for(stop.wait(), timeout=tsample)
             except TimeoutError:
                 pass
+    except Exception as ex:
+        # With several photometers, tell which one failed
+        ex.add_note(f"photometer {device.name}")
+        raise
     finally:
         _logger.info("end reader of %s", device.name)
         publish(None)

@@ -151,6 +151,24 @@ def enabled_sections(cparser, prefix):
     return result
 
 
+async def start_connection(device: Device):
+    """Read the metadata of the device"""
+    try:
+        # Serial I/O is blocking
+        await asyncio.to_thread(device.start_connection)
+    except Exception as ex:
+        ex.add_note(f"photometer {device.name}")
+        raise
+
+
+def error_summary(ex: BaseException) -> str:
+    """The causes of an exception in one line, also for exception groups"""
+    if isinstance(ex, BaseExceptionGroup):
+        return "; ".join(error_summary(sub) for sub in ex.exceptions)
+    notes = "".join(f"{note}: " for note in getattr(ex, "__notes__", []))
+    return f"{notes}{type(ex).__name__}: {ex}"
+
+
 async def run_service(cparser, photometers, loc_conf):
     """Read the photometers and send the measurements to files and MQTT servers.
 
@@ -173,7 +191,7 @@ async def run_service(cparser, photometers, loc_conf):
     file_secs = [(sec, output_interval(sec, 300.0)) for sec in enabled_sections(cparser, "file")]
 
     # Read metadata and calibration
-    await asyncio.gather(*(asyncio.to_thread(dev.start_connection) for dev, _, _ in photometers))
+    await asyncio.gather(*(start_connection(dev) for dev, _, _ in photometers))
 
     async with asyncio.TaskGroup() as tg:
         for sink, _ in mqtt_sinks:
@@ -243,22 +261,27 @@ def main(args=None):
 
     cparser.read_dict(ini_overrides)
 
-    loc_conf = build_location_from_ini(cparser)
-
-    photometers = []
-    for section in enabled_sections(cparser, "photometer"):
-        newdev = build_dev_from_ini(section)
-        newread = readerconf_from_ini(section)
-        photometers.append((newdev, newread, section))
-
-    if not photometers:
-        logger.warning("No devices enabled. Exit")
-        sys.exit(1)
-
     try:
+        loc_conf = build_location_from_ini(cparser)
+
+        photometers = []
+        for section in enabled_sections(cparser, "photometer"):
+            try:
+                # Opens the serial port
+                newdev = build_dev_from_ini(section)
+            except Exception as ex:
+                ex.add_note(f"section {section.name}")
+                raise
+            newread = readerconf_from_ini(section)
+            photometers.append((newdev, newread, section))
+
+        if not photometers:
+            logger.warning("No devices enabled. Exit")
+            sys.exit(1)
+
         asyncio.run(run_service(cparser, photometers, loc_conf))
-    except Exception:
-        logger.exception("tesstractor, ending with error")
+    except Exception as ex:
+        logger.exception("tesstractor, ending with error: %s", error_summary(ex))
         sys.exit(1)
 
     logger.info("tesstractor, ending")
