@@ -94,7 +94,9 @@ class Tess(Device):
         result["name"] = self.name
         result["model"] = "TESS"
         result["freq_sensor"] = 0.0
+        result["zero_point"] = self.calibration
         result["valid"] = False
+        result["tstamp"] = datetime.datetime.utcnow()
 
         if re_m["freq_pref"] is None:
             return result
@@ -112,7 +114,7 @@ class Tess(Device):
                 result["freq"] = int(re_m["freq"]) / 1.0
             else:
                 raise ValueError("freq_pref")
-            result["freq_sensor"] = result["freq"] * 1000.0
+            result["freq_sensor"] = result["freq"]
             result["magnitude"] = self.calibration - 2.5 * math.log10(result["freq"])
         acc_keys = ["temp_ambient", "temp_sky"]
         for key in acc_keys:
@@ -164,32 +166,6 @@ class Tess(Device):
 
         return capabilities
 
-    def filter_buffer(self, payloads):
-        # This function is not used anymore
-        npayloads = len(payloads)
-        result = dict(payloads[0])
-        # we have to average
-        # tstamp, freq, freq_sensor, magnitude
-        # magnitude corresponds to the mag of the average freq
-        if any([p["freq"] <= 0 for p in payloads]):
-            # FIXME: over/underflow
-            result["freq"] = result["freq_sensor"] = 0
-            result["magnitude"] = 99.0
-        else:
-            for key in ["freq_sensor"]:
-                result[key] = sum(p[key] for p in payloads) / npayloads
-            # print(result['freq'])
-            # print([p['freq'] <= 0 for p in payloads])
-            # print(any([p['freq'] <= 0 for p in payloads]))
-            result["freq"] = result["freq_sensor"] / 1000.0
-            result["magnitude"] = self.calibration - 2.5 * math.log10(result["freq"])
-
-        # average times
-        ts0 = payloads[0]["tstamp"]
-        ts = [(p["tstamp"] - ts0) for p in payloads]
-        result["tstamp"] = ts0 + sum(ts, datetime.timedelta(0)) / npayloads
-        return result
-
     def process_calibration(self, match):
         if match:
             return {"cmd": "c", "calibration": self.calibration}
@@ -203,11 +179,8 @@ class Tess(Device):
         pass
 
     def reset_device(self):
-        """Restart connection"""
+        """Discard pending input"""
         _logger.debug("reset device")
-        self.close_connection()
-        self.start_connection()
-        _logger.debug("reset done")
 
     def read_metadata(self, tries=1):
         """Read the serial number, firmware version."""
@@ -257,16 +230,12 @@ class Tess(Device):
                 return pmsg
             else:
                 logger.warning("malformed data, ignoring %s", msg)
-                logger.debug("data is %s", msg)
                 this_try += 1
                 time.sleep(self.cmd_wait)
                 self.reset_device()
-                time.sleep(self.cmd_wait)
-                return None
 
-        msg = "reading data after {} tries".format(tries)
-        logger.error(msg)
-        raise ValueError(msg)
+        logger.error("reading data after %d tries", tries)
+        return None
 
     def pass_command(self, cmd):
         pass
@@ -279,18 +248,24 @@ class TessR(Tess):
     def __init__(self, conn, name="tess", sleep_time=1, tries=10):
         super().__init__(name=name, model="TESS-R")
         self.serial = conn
-        # Clearing buffer
-        self.read_msg()
 
     def start_connection(self):
         """Start photometer connection"""
         _logger.debug("start connection")
         if not self.serial.is_open:
             self.serial.open()
+        self.serial.reset_input_buffer()
 
         self.read_metadata(tries=10)
         self.read_calibration(tries=10)
         self.read_data(tries=10)
+
+    def reset_device(self):
+        """Discard pending input, reopening the port if needed"""
+        _logger.debug("reset device")
+        if not self.serial.is_open:
+            self.serial.open()
+        self.serial.reset_input_buffer()
 
     def close_connection(self):
         """End photometer connection"""
@@ -331,8 +306,13 @@ class TessV2(Tess):
     def __init__(self, conn, name="tess", sleep_time=1, tries=10):
         super().__init__(name=name, model="TESSv2")
         self.serial = conn
-        # Clearing buffer
-        self.read_msg()
+
+    def start_connection(self):
+        """Start photometer connection"""
+        _logger.debug("start connection")
+        if not self.serial.is_open:
+            self.serial.open()
+        self.serial.reset_input_buffer()
 
     def close_connection(self):
         """End photometer connection"""
@@ -377,17 +357,13 @@ class TessV2(Tess):
             if res and isinstance(res, dict):
                 logger.debug("process message")
                 pmsg = self.process_msg(res)
-                logger.debug(f"processed data is {pmsg}")
+                logger.debug("processed data is %s", pmsg)
                 return pmsg
             else:
                 # We expect several non-json messages between correct msgs
-                # logger.debug('ignoring %s', msg)
-                # this_try += 1
                 return None
 
-        msg = f"unable to read data after {tries} tries"
-        logger.error(msg)
-        raise ValueError(msg)
+        return None
 
     def process_msg(self, res: typing.Mapping) -> dict:
         """Convert the message from the photometer to unified format"""
@@ -412,13 +388,19 @@ class TessV2(Tess):
             warnings.warn(msg, RuntimeWarning)
 
         # Actual lectures from the photometer
-        payload["freq_sensor"] = res.get("freq")  # Actual measurement, in Hz
-        payload["magnitude"] = res.get("mag")
-        payload["temp_ambient"] = res.get("tamb")
-        payload["temp_sky"] = res.get("tsky")
+        freq = res.get("freq")  # Actual measurement, in Hz
+        mag = res.get("mag")
+        if freq is None or mag is None:
+            _logger.warning("message without freq or mag, ignoring %s", res)
+            return None
+        payload["freq_sensor"] = freq
+        payload["magnitude"] = mag
+        payload["valid"] = True
+        # Temperatures are optional
+        for key, msg_key in [("temp_ambient", "tamb"), ("temp_sky", "tsky")]:
+            if res.get(msg_key) is not None:
+                payload[key] = res[msg_key]
 
         # Add time information
-        # Complete the payload with tstamp and TZ
-        now = datetime.datetime.utcnow()
-        payload["tstamp"] = now
+        payload["tstamp"] = datetime.datetime.utcnow()
         return payload
