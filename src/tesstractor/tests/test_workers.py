@@ -137,3 +137,20 @@ async def test_read_photometer_without_averaging():
     assert [p["seq"] for p in readings] == list(range(len(readings)))
     # Magnitude as given by the device
     assert all(p["magnitude"] == 19.29 for p in readings)
+
+
+def test_avg_keeps_device_magnitude():
+    # Covered SQM-LU 2747: the device gives 22.49, the frequency
+    # without its dark and temperature corrections gives 22.43
+    freq = 460800 / 4770416
+    res = avg_device_buffer([payload(freq, i, magnitude=mag) for i, mag in enumerate([22.49, 22.48, 22.50])])
+    assert res["magnitude"] == 22.49
+    assert res["freq_sensor"] == pytest.approx(freq)
+
+
+def test_avg_ignores_magnitude_of_invalid():
+    with pytest.warns(RuntimeWarning):
+        res = avg_device_buffer(
+            [payload(0, magnitude=99.0), payload(1.0, magnitude=20.0), payload(1.0, magnitude=20.2)]
+        )
+    assert res["magnitude"] == pytest.approx(20.1)

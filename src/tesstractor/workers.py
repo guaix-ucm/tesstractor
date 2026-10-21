@@ -10,7 +10,6 @@
 import asyncio
 import datetime
 import logging
-import math
 import typing
 import warnings
 
@@ -188,22 +187,20 @@ def avg_device_buffer(payloads):
     result = dict(payloads[0])
     result["valid"] = True
 
-    # we have to average
-    # tstamp and freq_sensor
-    # magnitude corresponds to the mag of the average freq
-    zero_point = result["zero_point"]
-
-    vals = [p["freq_sensor"] for p in payloads]
-    # TODO: analyze if there are values <= 0, extreme values, etc.
-    vals_0 = list(filter(lambda x: x > 0, vals))
-    if len(vals_0) != len(vals):
+    # we have to average tstamp, freq_sensor and magnitude
+    vals = [p for p in payloads if p["freq_sensor"] > 0]
+    # TODO: analyze extreme values, etc.
+    if len(vals) != len(payloads):
         msg = "some measurements have freq <= 0"
         warnings.warn(msg, RuntimeWarning)
 
-    if vals_0:
+    if vals:
         # Computing median
-        result["freq_sensor"] = float(numpy.median(vals_0))
-        result["magnitude"] = zero_point - 2.5 * math.log10(result["freq_sensor"])
+        result["freq_sensor"] = float(numpy.median([p["freq_sensor"] for p in vals]))
+        # The magnitude is not recomputed from the frequency: the one
+        # given by the device includes its corrections (dark current,
+        # temperature). Under dark skies the difference is ~0.06 mag in SQM
+        result["magnitude"] = float(numpy.median([p["magnitude"] for p in vals]))
     else:
         result["freq_sensor"] = 0
         result["magnitude"] = -99
