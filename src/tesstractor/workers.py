@@ -88,10 +88,17 @@ async def read_photometer(
             payload = dict(msg)
             payload["localtz"] = local_tz
             _logger.debug("payload is %s", payload)
-            internal_buffer.append(payload)
+
+            if nsamples <= 1:
+                # Send the measurement as given by the device
+                payload["seq"] = seq
+                publish(payload)
+                seq += 1
+            else:
+                internal_buffer.append(payload)
 
             # When we have enough measurements, we collapse
-            if len(internal_buffer) >= nsamples:
+            if internal_buffer and len(internal_buffer) >= nsamples:
                 _logger.debug("averaging %d samples", len(internal_buffer))
                 res = avg_device_buffer(internal_buffer)
                 res["seq"] = seq
@@ -157,6 +164,22 @@ async def periodic_average(q_in: asyncio.Queue, sink: Sink, interval: float):
             if payload is not None and payload["cmd"] == "r":
                 buffer.append(payload)
         await flush()
+
+
+async def forward_measurements(q_in: asyncio.Queue, sink: Sink):
+    """Send the measurements in q_in to sink without averaging.
+
+    Measurements that are not valid are ignored. Ends when None is received.
+    """
+    while True:
+        payload = await q_in.get()
+        if payload is None:
+            # None is a signal to exit
+            break
+        if payload["cmd"] == "r" and not payload.get("valid", True):
+            _logger.debug("measurement is not valid, ignoring %s", payload)
+            continue
+        await sink.send(payload)
 
 
 def avg_device_buffer(payloads):

@@ -24,7 +24,7 @@ from tesstractor.tess import TessR, TessV2
 from tesstractor.device import Device
 from tesstractor.mqtt import MqttSink
 from tesstractor.writef import FileSink
-from tesstractor.workers import QUEUE_MAXSIZE, read_photometer, periodic_average
+from tesstractor.workers import QUEUE_MAXSIZE, read_photometer, periodic_average, forward_measurements
 
 ini_defaults = {
     "provider": {"contact_name": "unknown", "organization": "unknown"},
@@ -130,6 +130,14 @@ def readerconf_from_ini(section):
     return readerconf
 
 
+def output_interval(section, default):
+    """Interval to average the measurements, 0 to send them without averaging"""
+    interval = section.getfloat("interval", default)
+    if interval < 0:
+        raise ValueError(f"interval in section {section.name} must be >= 0, is {interval}")
+    return interval
+
+
 def enabled_sections(cparser, prefix):
     """Sections starting with prefix, that are enabled"""
     logger = logging.getLogger(__name__)
@@ -157,15 +165,15 @@ async def run_service(cparser, photometers, loc_conf):
     for signum in [signal.SIGTERM, signal.SIGINT]:
         loop.add_signal_handler(signum, stop.set)
 
-    # Read metadata and calibration
-    await asyncio.gather(*(asyncio.to_thread(dev.start_connection) for dev, _, _ in photometers))
-
     mqtt_sinks = []
     for sec in enabled_sections(cparser, "mqtt"):
         logger.info("creating MQTT connection with %s", sec["hostname"])
-        mqtt_sinks.append((MqttSink(sec), sec.getfloat("interval", 60.0)))
+        mqtt_sinks.append((MqttSink(sec), output_interval(sec, 60.0)))
 
-    file_secs = enabled_sections(cparser, "file")
+    file_secs = [(sec, output_interval(sec, 300.0)) for sec in enabled_sections(cparser, "file")]
+
+    # Read metadata and calibration
+    await asyncio.gather(*(asyncio.to_thread(dev.start_connection) for dev, _, _ in photometers))
 
     async with asyncio.TaskGroup() as tg:
         for sink, _ in mqtt_sinks:
@@ -174,16 +182,19 @@ async def run_service(cparser, photometers, loc_conf):
         async with asyncio.TaskGroup() as producers:
             for dev, readerconf, dev_sec in photometers:
                 sinks = [(sink, interval) for sink, interval in mqtt_sinks]
-                for sec in file_secs:
+                for sec, interval in file_secs:
                     sink = FileSink(sec.get("dirname"), static_conf_from_ini(dev, dev_sec), loc_conf, loc_tz)
                     sink.open()
-                    sinks.append((sink, sec.getfloat("interval", 300.0)))
+                    sinks.append((sink, interval))
 
                 queues = []
                 for sink, interval in sinks:
                     q = asyncio.Queue(maxsize=QUEUE_MAXSIZE)
                     queues.append(q)
-                    producers.create_task(periodic_average(q, sink, interval))
+                    if interval > 0:
+                        producers.create_task(periodic_average(q, sink, interval))
+                    else:
+                        producers.create_task(forward_measurements(q, sink))
 
                 readerconf["tz"] = loc_tz
                 producers.create_task(read_photometer(dev, queues, readerconf, stop))

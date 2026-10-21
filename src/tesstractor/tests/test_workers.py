@@ -5,7 +5,7 @@ import pytest
 import pytz
 
 from ..sqm import SQMTest
-from ..workers import avg_device_buffer, periodic_average, put_drop_oldest, read_photometer
+from ..workers import avg_device_buffer, forward_measurements, periodic_average, put_drop_oldest, read_photometer
 
 T0 = datetime.datetime(2026, 1, 1, tzinfo=datetime.UTC)
 
@@ -104,3 +104,36 @@ async def test_read_photometer():
     assert items[1]["cmd"] == "r"
     assert items[1]["seq"] == 0
     assert items[-1] is None
+
+
+async def test_forward_measurements():
+    q = asyncio.Queue()
+    sink = ListSink()
+    q.put_nowait(dict(cmd="id", name="sqm1"))
+    q.put_nowait(payload(1.0, magnitude=17.54))
+    q.put_nowait(payload(0.0, valid=False))
+    q.put_nowait(payload(2.0, magnitude=17.12))
+    q.put_nowait(None)
+    await forward_measurements(q, sink)
+    # Invalid measurements are ignored, the rest are not modified
+    assert [p["cmd"] for p in sink.items] == ["id", "r", "r"]
+    assert [p.get("magnitude") for p in sink.items[1:]] == [17.54, 17.12]
+
+
+async def test_read_photometer_without_averaging():
+    dev = SQMTest()
+    dev.start_connection()
+    q = asyncio.Queue()
+    stop = asyncio.Event()
+    readerconf = dict(nsamples=1, tsample=0.01, tz=pytz.timezone("Europe/Madrid"))
+    task = asyncio.create_task(read_photometer(dev, [q], readerconf, stop))
+    await asyncio.sleep(0.1)
+    stop.set()
+    await task
+    items = []
+    while not q.empty():
+        items.append(q.get_nowait())
+    readings = [p for p in items if p is not None and p["cmd"] == "r"]
+    assert [p["seq"] for p in readings] == list(range(len(readings)))
+    # Magnitude as given by the device
+    assert all(p["magnitude"] == 19.29 for p in readings)
