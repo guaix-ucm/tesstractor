@@ -1,7 +1,7 @@
 #
 # Copyright 2018-2024 Universidad Complutense de Madrid
 #
-# This file is part of tessreader
+# This file is part of tesstractor
 #
 # SPDX-License-Identifier: GPL-3.0-or-later
 # License-Filename: LICENSE.txt
@@ -41,6 +41,9 @@ CALIB_RE = re.compile(
     re.VERBOSE,
 )
 
+# Period counts are measured with a 460.8 kHz clock (14.7456 MHz / 32)
+SQM_CLOCK_HZ = 460800.0
+
 META_RE = re.compile(
     rb"""
                 (?P<cmd>i),
@@ -57,6 +60,18 @@ _logger = logging.getLogger(__name__)
 
 class SQMConf(PhotometerConf):
     pass
+
+
+def sensor_frequency(match):
+    """Frequency of the sensor, in Hz.
+
+    The integer Hz field is 0 under dark skies, so the frequency
+    is computed from the period counts when they are available.
+    """
+    counts = int(match.group("period_counts"))
+    if counts > 0:
+        return SQM_CLOCK_HZ / counts
+    return float(match.group("freq"))
 
 
 class SQM(Device):
@@ -113,16 +128,14 @@ class SQM(Device):
         result["model"] = "SQM"
         result["cmd"] = match.group("cmd").decode("utf-8")
         result["magnitude"] = float(match.group("magnitude"))
-        # result['freq'] = int(match.group('freq'))
-        result["freq_sensor"] = int(match.group("freq"))
+        result["freq_sensor"] = sensor_frequency(match)
         result["period"] = float(match.group("period"))
         result["temp_ambient"] = float(match.group("temp_ambient"))
         result["zero_point"] = self.calibration
         result["valid"] = True
         # Add time information
         # Complete the payload with tstamp
-        now = datetime.datetime.utcnow()
-        result["tstamp"] = now
+        result["tstamp"] = datetime.datetime.utcnow()
         return result
 
     def process_calibration(self, match):
@@ -140,106 +153,62 @@ class SQM(Device):
         pass
 
     def reset_device(self):
-        """Restart connection"""
+        """Discard pending input, so that the next answer is in sync"""
         _logger.debug("reset device")
-        self.close_connection()
-        self.start_connection()
+
+    def query(self, cmd, regex, tries=1):
+        """Send a command and return the match of its answer.
+
+        The command is sent again in each try. Return None if
+        there is no valid answer after `tries` tries.
+        """
+        for _ in range(tries):
+            _logger.debug("passing command %s", cmd)
+            self.pass_command(cmd)
+            msg = self.read_msg()
+            _logger.debug("msg is %s", msg)
+            match = regex.match(msg)
+            if match:
+                return match
+            _logger.warning("malformed answer to %s, try again: %s", cmd, msg)
+            time.sleep(self.cmd_wait)
+            self.reset_device()
+        _logger.error("no valid answer to %s after %d tries", cmd, tries)
+        return None
 
     def read_metadata(self, tries=1):
         """Read the serial number, firmware version."""
-
-        logger = logging.getLogger(__name__)
-
-        cmd = b"ix"
-        logger.debug("passing command %s", cmd)
-        self.pass_command(cmd)
-        time.sleep(self.cmd_wait)
-
-        this_try = 0
-        while this_try < tries:
-            msg = self.read_msg()
-            logger.debug("msg is %s", msg)
-            meta_match = META_RE.match(msg)
-            if meta_match:
-                logger.debug("process metadata")
-                pmsg = self.process_metadata(meta_match)
-                logger.debug("metadata is %s", pmsg)
-                return pmsg
-            else:
-                logger.warning("malformed metadata, try again")
-                this_try += 1
-                time.sleep(self.cmd_wait)
-                self.reset_device()
-                time.sleep(self.cmd_wait)
-
-        logger.error("reading metadata after %d tries", tries)
-        raise ValueError
+        match = self.query(b"ix", META_RE, tries)
+        if match is None:
+            raise ValueError(f"unable to read metadata after {tries} tries")
+        pmsg = self.process_metadata(match)
+        _logger.debug("metadata is %s", pmsg)
+        return pmsg
 
     def read_calibration(self, tries=1):
         """Read the calibration parameters"""
-
-        logger = logging.getLogger(__name__)
-
-        cmd = b"cx"
-        logger.debug("passing command %s", cmd)
-        self.pass_command(cmd)
-        time.sleep(self.cmd_wait)
-
-        this_try = 0
-        while this_try < tries:
-            msg = self.read_msg()
-            logger.debug("msg is %s", msg)
-            match = CALIB_RE.match(msg)
-            if match:
-                logger.debug("process calibration")
-                pmsg = self.process_calibration(match)
-                logger.debug("calibration is %s", pmsg)
-                return pmsg
-            else:
-                logger.warning("malformed calibration, try again")
-                this_try += 1
-                time.sleep(self.cmd_wait)
-                self.reset_device()
-                time.sleep(self.cmd_wait)
-
-        logger.error("reading calibration after %d tries", tries)
-        raise ValueError
+        match = self.query(b"cx", CALIB_RE, tries)
+        if match is None:
+            raise ValueError(f"unable to read calibration after {tries} tries")
+        pmsg = self.process_calibration(match)
+        _logger.debug("calibration is %s", pmsg)
+        return pmsg
 
     def read_data(self, tries=1):
-        """Read the calibration parameters"""
-
-        logger = logging.getLogger(__name__)
-
-        cmd = b"rx"
-        logger.debug("passing command %s", cmd)
-        self.pass_command(cmd)
-        time.sleep(self.cmd_wait)
-
-        this_try = 0
-        while this_try < tries:
-            msg = self.read_msg()
-            logger.debug("msg is %s", msg)
-            match = MEASURE_RE.match(msg)
-            if match:
-                pmsg = self.process_msg(match)
-                logger.debug("data is %s", pmsg)
-
-                if pmsg["magnitude"] < 0:
-                    logger.warning("negative measured magnitude, try again")
-                    this_try += 1
-                    time.sleep(self.cmd_wait)
-                    continue
-
-                return pmsg
-            else:
-                logger.warning("malformed data, try again")
-                logger.debug("data is %s", msg)
-                this_try += 1
+        """Read a measurement. Return None if there is no valid data"""
+        for _ in range(tries):
+            match = self.query(b"rx", MEASURE_RE)
+            if match is None:
+                continue
+            pmsg = self.process_msg(match)
+            _logger.debug("data is %s", pmsg)
+            if pmsg["magnitude"] < 0:
+                _logger.warning("negative measured magnitude, try again")
                 time.sleep(self.cmd_wait)
-                self.reset_device()
-                time.sleep(self.cmd_wait)
+                continue
+            return pmsg
 
-        logger.error("reading data after %d tries", tries)
+        _logger.error("reading data after %d tries", tries)
         return None
 
     def pass_command(self, cmd):
@@ -253,18 +222,23 @@ class SQMLU(SQM):
     def __init__(self, conn, name="", sleep_time=1, tries=10):
         super().__init__(name=name, model="SQM-LU")
         self.serial = conn
-        # Clearing buffer
-        self.read_msg()
 
     def start_connection(self):
         """Start photometer connection"""
         _logger.debug("start connection")
-        time.sleep(self.cmd_wait)
+        if not self.serial.is_open:
+            self.serial.open()
+        self.serial.reset_input_buffer()
         self.read_metadata(tries=10)
-        time.sleep(self.cmd_wait)
         self.read_calibration(tries=10)
-        time.sleep(self.cmd_wait)
         self.read_data(tries=10)
+
+    def reset_device(self):
+        """Discard pending input, reopening the port if needed"""
+        _logger.debug("reset device")
+        if not self.serial.is_open:
+            self.serial.open()
+        self.serial.reset_input_buffer()
 
     def close_connection(self):
         """End photometer connection"""
