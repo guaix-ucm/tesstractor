@@ -16,7 +16,6 @@ import datetime
 
 from .device import Device, PhotometerConf
 
-
 MEASURE_RE = re.compile(
     rb"""
                 \s* # Skip whitespace

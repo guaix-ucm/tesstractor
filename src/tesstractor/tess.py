@@ -19,7 +19,6 @@ import warnings
 
 from .device import Device, PhotometerConf
 
-
 MEASURE_RE = re.compile(
     rb"""
     ^(<f(?P<freq_pref>[mH])((?P<freq_u>(?<=m)-.{5})|(?P<freq_o>(?<=H)-.{5})|(?P<freq>\ \d{5}))>
@@ -404,9 +403,7 @@ class TessV2(Tess):
 
         msg_zp = res.get("ZP")
         if self.calibration != msg_zp:
-            msg = "Calibration values don't agree: self:{} payload:{}".format(
-                self.calibration, msg_zp
-            )
+            msg = "Calibration values don't agree: self:{} payload:{}".format(self.calibration, msg_zp)
             warnings.warn(msg, RuntimeWarning)
 
         msg_rev = res.get("rev")

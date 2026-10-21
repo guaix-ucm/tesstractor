@@ -17,7 +17,6 @@ import queue
 
 import pytz
 
-
 _logger = logging.getLogger(__name__)
 
 
@@ -182,9 +181,7 @@ def consumer_write_file(intput_q: queue.Queue, config):
                 valid_inter = rot.in_interval(now_local_n)
                 next_change = valid_inter.max_val
                 valid_fname = calc_filename(now_local_n, name=insconf.name)
-                init_file(
-                    os.path.join(config.dirname, valid_fname), insconf, config.location
-                )
+                init_file(os.path.join(config.dirname, valid_fname), insconf, config.location)
             _logger.debug("write to file")
             write_to_file(payload, config.dirname, valid_fname)
             intput_q.task_done()
@@ -207,11 +204,7 @@ def update_p(payload):
 def write_to_file(payload, dirname, filename):
     """Write payload to file"""
     payload["tstamp_str"] = payload["tstamp"].isoformat("T", timespec="milliseconds")
-    payload["tstamp_local_str"] = (
-        payload["tstamp_local"]
-        .replace(tzinfo=None)
-        .isoformat("T", timespec="milliseconds")
-    )
+    payload["tstamp_local_str"] = payload["tstamp_local"].replace(tzinfo=None).isoformat("T", timespec="milliseconds")
     # m.isoformat('T', timespec='milliseconds')
     line_tpl = (
         "{tstamp_str};{tstamp_local_str};{temp_ambient:.2f};"

@@ -178,14 +178,10 @@ def create_mqtt_workers(q_worker: queue.Queue, mqtt_config) -> List[threading.Th
 
     interval = mqtt_config.getfloat("interval", 60.0)
     other_mqtt = mqtt.MqttConsumer(mqtt_config)
-    consumer_mqtt = threading.Thread(
-        target=mqtt.consumer_mqtt, name="mqtt_consumer", args=(q_mqtt_in, other_mqtt)
-    )
+    consumer_mqtt = threading.Thread(target=mqtt.consumer_mqtt, name="mqtt_consumer", args=(q_mqtt_in, other_mqtt))
 
     send_event = None
-    timed_buffer = threading.Timer(
-        interval, periodic_avg_task, args=(q_buffer, q_mqtt_in, send_event)
-    )
+    timed_buffer = threading.Timer(interval, periodic_avg_task, args=(q_buffer, q_mqtt_in, send_event))
     timed_buffer.name = "timed_buffer_mqtt"
 
     filter_thread.start()
@@ -195,9 +191,7 @@ def create_mqtt_workers(q_worker: queue.Queue, mqtt_config) -> List[threading.Th
     return [filter_thread, consumer_mqtt]
 
 
-def create_file_writer_workers(
-    q_worker: queue.Queue, file_config: OtherConf
-) -> List[threading.Thread]:
+def create_file_writer_workers(q_worker: queue.Queue, file_config: OtherConf) -> List[threading.Thread]:
 
     otherx = OtherConf()
     q_file_in = queue.Queue()  # Queue for file writer
@@ -216,9 +210,7 @@ def create_file_writer_workers(
     # This Timer thread wakes up periodically and averages values in (q_buffer)
     # After that, the average is sent to writer queue (q_file_in)
     interval = file_config.interval
-    timed_buffer = threading.Timer(
-        interval, periodic_avg_task, args=(q_buffer, q_file_in, send_event)
-    )
+    timed_buffer = threading.Timer(interval, periodic_avg_task, args=(q_buffer, q_file_in, send_event))
     timed_buffer.name = "timed_buffer_file"
 
     # This thread writes the values in writer queue (q_file_in)
@@ -367,9 +359,7 @@ def main(args=None):
 
     # Send data to workers
     # basically, write-to-file and mqtt
-    consd = threading.Thread(
-        name="splitter", target=splitter, args=(q_reader, working_qs)
-    )
+    consd = threading.Thread(name="splitter", target=splitter, args=(q_reader, working_qs))
     consd.start()
     joinable_threads.append(consd)
 

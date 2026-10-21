@@ -20,7 +20,6 @@ import tzlocal
 
 from tesstractor.sqm import Device
 
-
 _logger = logging.getLogger(__name__)
 
 

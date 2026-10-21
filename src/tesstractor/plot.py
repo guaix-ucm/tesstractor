@@ -220,13 +220,9 @@ def plot_table(tab):
     height = tab.meta["height"]
     timezone = tab.meta["timezone"]
     location = EarthLocation(lat=lat, lon=lon, height=height)
-    site = astroplan.Observer(
-        location=location, name=tab.meta["location_name"], timezone=timezone
-    )
+    site = astroplan.Observer(location=location, name=tab.meta["location_name"], timezone=timezone)
 
-    t1 = np.array(
-        [pytz.utc.localize(datetime.fromisoformat(value)) for value in tab["time_utc"]]
-    )
+    t1 = np.array([pytz.utc.localize(datetime.fromisoformat(value)) for value in tab["time_utc"]])
     tval_local = np.array([tutc.astimezone(site.timezone) for tutc in t1])
     magval_local = tab["mag"]
 

@@ -14,7 +14,6 @@ import queue
 
 import paho.mqtt.client as mqtt
 
-
 _HALF_S = datetime.timedelta(seconds=0.5)
 
 _logger = logging.getLogger(__name__)
@@ -36,9 +35,7 @@ class MqttConsumer:
     # client.loop_start()
 
     def connect(self):
-        self.client.username_pw_set(
-            self.config["username"], password=self.config["password"]
-        )
+        self.client.username_pw_set(self.config["username"], password=self.config["password"])
         _logger.info("open MQTT connection with {}".format(self.config["hostname"]))
         self.client.connect(self.config["hostname"], 1883, 60)
 
