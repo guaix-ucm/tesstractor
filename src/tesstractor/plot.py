@@ -18,7 +18,7 @@ import pytz
 import matplotlib.pyplot as plt
 import matplotlib.dates as mdates
 import matplotlib.patches as mpatches
-from astropy.coordinates import get_sun, get_moon
+from astropy.coordinates import get_sun, get_body
 from astropy.coordinates import EarthLocation
 from astropy.time import Time
 import astropy.table
@@ -27,6 +27,8 @@ import astroplan
 
 # Import IDA format reader
 import tesstractor.reader  # noqa
+
+_logger = logging.getLogger(__name__)
 
 # Style for saving into PNG
 my_style1 = {"figure.figsize": (9, 7), "savefig.dpi": 200, "axes.labelsize": 14}
@@ -93,7 +95,7 @@ def plot_sun(ax, site, base_time):
             ax.axvline(sun_m_dt, color="r", ls="--", lw=2, alpha=0.5, clip_on=True)
     else:
         if there_is_day:
-            print("The sun is over the horizon all day")
+            _logger.info("The sun is over the horizon all day")
             rect = mpatches.Rectangle(
                 (0, 0),
                 width=1,
@@ -104,7 +106,7 @@ def plot_sun(ax, site, base_time):
             )
             ax.add_patch(rect)
         else:
-            print("The sun is under the horizon all night")
+            _logger.info("The sun is under the horizon all night")
     # Reset
     ax.set_xlim((tmin, tmax))
 
@@ -125,11 +127,11 @@ def plot_moon(ax, site, base_time):
         newtime += timedelta(minutes=15)
 
     times = Time(ctimes_dt)
-    moon_altaz = site.altaz(times, get_moon(times))
+    moon_altaz = site.altaz(times, get_body("moon", times, location=site.location))
     min_alt = min(moon_altaz.alt)
     max_alt = max(moon_altaz.alt)
 
-    print("min alt:", min_alt.deg, "max alt:", max_alt.deg)
+    _logger.debug("moon min alt: %s, max alt: %s", min_alt.deg, max_alt.deg)
     ax.set_ylim([0, 90])
     ax.set_ylabel("Moon altitude (deg)")
     ax.plot(ctimes_dt, moon_altaz.alt, ls="-.", lw=1, color="black")
@@ -260,7 +262,7 @@ def main(args=None):
     parser.add_argument(
         "--log",
         default="INFO",
-        choices=["DEBUG", "INFO", "WARNING", "ERROR", "CRTICAL", "NOTSET"],
+        choices=["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL", "NOTSET"],
     )
     parser.add_argument("path")
     pargs = parser.parse_args(args=args)
