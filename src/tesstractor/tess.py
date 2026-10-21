@@ -9,7 +9,6 @@
 
 
 import logging
-import time
 import re
 import math
 import datetime
@@ -17,7 +16,7 @@ import json
 import typing
 import warnings
 
-from .device import Device, PhotometerConf, read_line
+from .device import Device, LineReader, PhotometerConf
 
 MEASURE_RE = re.compile(
     rb"""
@@ -235,9 +234,9 @@ class Tess(Device):
                     logger.warning("malformed data, ignoring %s", msg)
                 else:
                     logger.debug("no data before timeout")
+                # The device sends lines continuously, the next
+                # line is in sync, there is no need to reset
                 this_try += 1
-                time.sleep(self.cmd_wait)
-                self.reset_device()
 
         logger.error("reading data after %d tries", tries)
         return None
@@ -253,13 +252,12 @@ class TessR(Tess):
     def __init__(self, conn, name="tess", sleep_time=1, tries=10):
         super().__init__(name=name, model="TESS-R")
         self.serial = conn
+        self.lines = LineReader(conn)
 
     def start_connection(self):
         """Start photometer connection"""
         _logger.debug("start connection")
-        if not self.serial.is_open:
-            self.serial.open()
-        self.serial.reset_input_buffer()
+        self.lines.reset()
 
         self.read_metadata(tries=10)
         self.read_calibration(tries=10)
@@ -268,9 +266,7 @@ class TessR(Tess):
     def reset_device(self):
         """Discard pending input, reopening the port if needed"""
         _logger.debug("reset device")
-        if not self.serial.is_open:
-            self.serial.open()
-        self.serial.reset_input_buffer()
+        self.lines.reset()
 
     def close_connection(self):
         """End photometer connection"""
@@ -280,7 +276,7 @@ class TessR(Tess):
 
     def read_msg(self):
         """Read the data"""
-        msg = read_line(self.serial)
+        msg = self.lines.readline()
         return msg
 
     def pass_command(self, cmd):
@@ -311,13 +307,12 @@ class TessV2(Tess):
     def __init__(self, conn, name="tess", sleep_time=1, tries=10):
         super().__init__(name=name, model="TESSv2")
         self.serial = conn
+        self.lines = LineReader(conn)
 
     def start_connection(self):
         """Start photometer connection"""
         _logger.debug("start connection")
-        if not self.serial.is_open:
-            self.serial.open()
-        self.serial.reset_input_buffer()
+        self.lines.reset()
 
     def close_connection(self):
         """End photometer connection"""
@@ -326,7 +321,7 @@ class TessV2(Tess):
 
     def read_msg(self):
         """Read messages from the photometer"""
-        msg = read_line(self.serial)
+        msg = self.lines.readline()
         return msg
 
     def pass_command(self, cmd):

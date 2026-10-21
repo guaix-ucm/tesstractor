@@ -12,15 +12,39 @@
 MAX_LINE = 1024
 
 
-def read_line(conn):
-    """Read a line from the serial port.
+class LineReader:
+    """Read lines from a serial port.
 
     Serial.readline applies the timeout to each byte, it blocks
     while bytes without a newline keep arriving (for example, with
-    a wrong baud rate). read_until applies the timeout to the line.
+    a wrong baud rate). Here the timeout applies to each call, and
+    a line that is not complete when the timeout expires is kept
+    for the next call, some devices send the lines in pieces.
     """
-    # Some ports send NUL bytes after being opened
-    return conn.read_until(b"\n", MAX_LINE).lstrip(b"\x00")
+
+    def __init__(self, conn):
+        self.conn = conn
+        self.partial = b""
+
+    def readline(self):
+        """Return a complete line, or b"" if there is none before the timeout.
+
+        Bytes without a newline are returned when they reach MAX_LINE.
+        """
+        line = self.partial + self.conn.read_until(b"\n", MAX_LINE - len(self.partial))
+        if line.endswith(b"\n") or len(line) >= MAX_LINE:
+            self.partial = b""
+            # Some ports send NUL bytes after being opened
+            return line.lstrip(b"\x00")
+        self.partial = line
+        return b""
+
+    def reset(self):
+        """Discard pending input, reopening the port if needed"""
+        if not self.conn.is_open:
+            self.conn.open()
+        self.conn.reset_input_buffer()
+        self.partial = b""
 
 
 class Device:

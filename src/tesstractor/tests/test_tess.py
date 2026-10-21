@@ -63,3 +63,15 @@ def test_tessv2_missing_values():
     dev = TessV2(StreamSerial([b'{"rev":2,"freq":13.38,"ZP":20.0}\r\n']), "stars605")
     dev.calibration = 20.0
     assert dev.read_data() is None
+
+
+def test_tessr_line_in_pieces():
+    # Each read returns a piece of a line, as when the timeout expires
+    conn = StreamSerial([b"<fH 04606><", b"tA +2987><tO +2481>\r\n", b"<fH 04", b"607>\r\n"])
+    dev = TessR(conn, "tess1")
+    dev.calibration = 20.5
+    # The first try only gets a piece, it is not discarded
+    res = dev.read_data(tries=3)
+    assert res["freq_sensor"] == 4606.0
+    assert res["temp_ambient"] == 29.87
+    assert dev.read_data(tries=3)["freq_sensor"] == 4607.0

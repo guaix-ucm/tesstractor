@@ -14,7 +14,7 @@ import re
 import datetime
 
 
-from .device import Device, PhotometerConf, read_line
+from .device import Device, LineReader, PhotometerConf
 
 MEASURE_RE = re.compile(
     rb"""
@@ -222,13 +222,12 @@ class SQMLU(SQM):
     def __init__(self, conn, name="", sleep_time=1, tries=10):
         super().__init__(name=name, model="SQM-LU")
         self.serial = conn
+        self.lines = LineReader(conn)
 
     def start_connection(self):
         """Start photometer connection"""
         _logger.debug("start connection")
-        if not self.serial.is_open:
-            self.serial.open()
-        self.serial.reset_input_buffer()
+        self.lines.reset()
         self.read_metadata(tries=10)
         self.read_calibration(tries=10)
         self.read_data(tries=10)
@@ -236,9 +235,7 @@ class SQMLU(SQM):
     def reset_device(self):
         """Discard pending input, reopening the port if needed"""
         _logger.debug("reset device")
-        if not self.serial.is_open:
-            self.serial.open()
-        self.serial.reset_input_buffer()
+        self.lines.reset()
 
     def close_connection(self):
         """End photometer connection"""
@@ -252,7 +249,7 @@ class SQMLU(SQM):
 
     def read_msg(self):
         """Read the data"""
-        msg = read_line(self.serial)
+        msg = self.lines.readline()
         return msg
 
     def pass_command(self, cmd):
