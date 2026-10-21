@@ -65,7 +65,7 @@ def test_sqmlu_start_connection():
     assert dev.calibration == 19.89
     conf = dev.static_conf()
     assert conf.serial_number == 2747
-    assert conf.rx_readout == RX.strip()
+    assert conf.rx_readout == RX.strip().decode()
 
 
 def test_sqmlu_malformed_answer_retries():

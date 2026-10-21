@@ -104,7 +104,7 @@ class SQM(Device):
 
     def process_metadata(self, match):
         if match:
-            self.ix_readout = match.group()
+            self.ix_readout = match.group().decode("ascii")
             self.protocol_number = int(match.group("protocol_number"))
             self.model_number = int(match.group("model_number"))
             self.feature_number = int(match.group("feature_number"))
@@ -122,7 +122,7 @@ class SQM(Device):
 
     def process_msg(self, match) -> dict:
         """Convert the message from the photometer to unified format"""
-        self.rx_readout = match.group()
+        self.rx_readout = match.group().decode("ascii")
         result = dict()
         result["name"] = self.name
         result["model"] = "SQM"
@@ -140,7 +140,7 @@ class SQM(Device):
 
     def process_calibration(self, match):
         if match:
-            self.cx_readout = match.group()
+            self.cx_readout = match.group().decode("ascii")
             self.calibration = float(match.group("light_cal"))
             return {"cmd": "c", "calibration": self.calibration}
         else:
