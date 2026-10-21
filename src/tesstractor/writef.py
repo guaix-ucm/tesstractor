@@ -188,16 +188,16 @@ def write_to_file(payload, dirname, filename):
     """Write payload to file"""
     payload["tstamp_str"] = payload["tstamp"].replace(tzinfo=None).isoformat("T", timespec="milliseconds")
     payload["tstamp_local_str"] = payload["tstamp_local"].replace(tzinfo=None).isoformat("T", timespec="milliseconds")
+    # Data not provided by the device is left empty, as in the NSBM standard
+    for key in ["temp_ambient", "temp_sky"]:
+        value = payload.get(key)
+        payload[f"{key}_str"] = "" if value is None else f"{value:.2f}"
     line_tpl = (
-        "{tstamp_str};{tstamp_local_str};{temp_ambient:.2f};"
-        "{temp_sky:.2f};{freq_sensor:.3f};{magnitude:.2f};{zero_point}"
+        "{tstamp_str};{tstamp_local_str};{temp_ambient_str};"
+        "{temp_sky_str};{freq_sensor:.3f};{magnitude:.2f};{zero_point}"
     )
     with open(os.path.join(dirname, filename), "a") as fd:
         if payload["cmd"] == "r":
-            if "temp_ambient" not in payload:
-                payload["temp_ambient"] = 0.0
-            if "temp_sky" not in payload:
-                payload["temp_sky"] = 0.0
             msg = line_tpl.format(**payload)
             print(msg, file=fd)
     return 0

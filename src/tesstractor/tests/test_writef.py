@@ -41,13 +41,22 @@ async def test_file_sink_roundtrip(tmp_path):
     with open(tmp_path / "sub" / fname) as fd:
         content = fd.read()
     assert "# Number of fields per line: 7" in content
-    assert "# Measurement direction per channel: 0.0, 10.0" in content
+    # Zenith and azimuth, in that order
+    assert "# Measurement direction per channel: 10.0, 0.0" in content
+    assert "# Position: 40.4189, -3.6919, 650\n" in content
+    # SQM has no sky temperature, the field is empty
+    data_line = content.splitlines()[-1]
+    assert data_line.split(";")[2:4] == ["29.90", ""]
     assert "# SQM cover offset value: -0.11" in content
 
     tab = astropy.table.Table.read(str(tmp_path / "sub" / fname), format="ascii.IDA")
     assert len(tab) == 3
     assert tab.meta["lat"].value == pytest.approx(40.4189)
     assert tab.meta["lon"].value == pytest.approx(-3.6919)
+    assert tab["temp"][0] == pytest.approx(29.9)
+    # Empty fields are masked
+    assert tab["sky_temp"].mask.all()
+    assert tab["mag"].dtype.kind == "f"
     # No time zone suffix in the times
     assert len(tab["time_utc"][0]) == 23
 

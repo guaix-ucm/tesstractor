@@ -6,14 +6,14 @@
 # Instrument ID: {instrument.serial_number}
 # Data supplier: {location.contact_name} / {location.organization}
 # Location name: {location.locality}/{location.province}/{location.country} - {location.site}
-# Position: {location.latitude}, {location.longitude}, {location.elevation}
+# Position: {location.latitude:.4f}, {location.longitude:.4f}, {location.elevation:.0f}
 # Local timezone: {location.timezone}
 # Time Synchronization: {location.timesync}
 # Moving / Stationary position: STATIONARY
 # Moving / Fixed look direction: FIXED
 # Number of channels: 1
 # Filters per channel: {instrument.filter}
-# Measurement direction per channel: {instrument.azimuth}, {instrument.zenith}
+# Measurement direction per channel: {instrument.zenith}, {instrument.azimuth}
 # Field of view: {instrument.fov}
 # Number of fields per line: 7
 # TESS MAC address: {instrument.mac_address}
