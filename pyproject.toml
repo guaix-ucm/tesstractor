@@ -7,16 +7,16 @@ name = "tesstractor"
 dynamic = ["version"]
 description = "TESS photometer reading software"
 readme = "README.md"
-requires-python = ">=3.10"
+requires-python = ">=3.11"
 license = {text = "GPL-3.0-or-later"}
 authors = [
   {name = "Sergio Pascual", email = "sergiopr@fis.ucm.es"},
 ]
 classifiers = [
-    "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
     "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
     "Development Status :: 3 - Alpha",
     "Environment :: Console",
     "Intended Audience :: Science/Research",
@@ -63,7 +63,7 @@ where = ["src"]
 
 [tool.black]
 line-length = 120
-target-version = ['py310', 'py311', 'py312', 'py313', 'py314']
+target-version = ['py311', 'py312', 'py313', 'py314']
 skip-string-normalization = false
 include = '\.pyi?$'
 exclude = '''
