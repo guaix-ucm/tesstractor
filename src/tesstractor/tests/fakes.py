@@ -32,7 +32,7 @@ class FakeSerial:
         line = lines.popleft() if len(lines) > 1 else lines[0]
         self.pending.append(line)
 
-    def readline(self):
+    def read_until(self, expected=b"\n", size=None):
         self._check_open()
         if self.pending:
             return self.pending.popleft()
@@ -53,7 +53,7 @@ class StreamSerial(FakeSerial):
     def reset_input_buffer(self):
         self._check_open()
 
-    def readline(self):
+    def read_until(self, expected=b"\n", size=None):
         self._check_open()
         if self.lines:
             return self.lines.popleft()

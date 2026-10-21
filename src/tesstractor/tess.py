@@ -17,7 +17,7 @@ import json
 import typing
 import warnings
 
-from .device import Device, PhotometerConf
+from .device import Device, PhotometerConf, read_line
 
 MEASURE_RE = re.compile(
     rb"""
@@ -199,11 +199,13 @@ class Tess(Device):
                 self.check_capabilities(match)
                 return msg
             else:
-                logger.warning("malformed data, ignoring %s", msg)
-                logger.debug("data is %s", msg)
+                if msg:
+                    logger.warning("malformed data, ignoring %s", msg)
+                else:
+                    logger.debug("no data before timeout")
                 this_try += 1
 
-        msg = "reading data after {} tries".format(tries)
+        msg = f"no valid data after {tries} tries, check the port and the baud rate"
         logger.error(msg)
         raise ValueError(msg)
 
@@ -229,7 +231,10 @@ class Tess(Device):
                 logger.debug("data is %s", pmsg)
                 return pmsg
             else:
-                logger.warning("malformed data, ignoring %s", msg)
+                if msg:
+                    logger.warning("malformed data, ignoring %s", msg)
+                else:
+                    logger.debug("no data before timeout")
                 this_try += 1
                 time.sleep(self.cmd_wait)
                 self.reset_device()
@@ -275,7 +280,7 @@ class TessR(Tess):
 
     def read_msg(self):
         """Read the data"""
-        msg = self.serial.readline()
+        msg = read_line(self.serial)
         return msg
 
     def pass_command(self, cmd):
@@ -321,7 +326,7 @@ class TessV2(Tess):
 
     def read_msg(self):
         """Read messages from the photometer"""
-        msg = self.serial.readline()
+        msg = read_line(self.serial)
         return msg
 
     def pass_command(self, cmd):

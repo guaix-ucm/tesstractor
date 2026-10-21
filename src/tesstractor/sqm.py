@@ -14,7 +14,7 @@ import re
 import datetime
 
 
-from .device import Device, PhotometerConf
+from .device import Device, PhotometerConf, read_line
 
 MEASURE_RE = re.compile(
     rb"""
@@ -180,7 +180,7 @@ class SQM(Device):
         """Read the serial number, firmware version."""
         match = self.query(b"ix", META_RE, tries)
         if match is None:
-            raise ValueError(f"unable to read metadata after {tries} tries")
+            raise ValueError(f"unable to read metadata after {tries} tries, check the port and the baud rate")
         pmsg = self.process_metadata(match)
         _logger.debug("metadata is %s", pmsg)
         return pmsg
@@ -252,7 +252,7 @@ class SQMLU(SQM):
 
     def read_msg(self):
         """Read the data"""
-        msg = self.serial.readline()
+        msg = read_line(self.serial)
         return msg
 
     def pass_command(self, cmd):

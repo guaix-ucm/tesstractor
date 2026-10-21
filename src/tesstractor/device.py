@@ -8,6 +8,21 @@
 #
 
 
+# Maximum length of a line from the photometer
+MAX_LINE = 1024
+
+
+def read_line(conn):
+    """Read a line from the serial port.
+
+    Serial.readline applies the timeout to each byte, it blocks
+    while bytes without a newline keep arriving (for example, with
+    a wrong baud rate). read_until applies the timeout to the line.
+    """
+    # Some ports send NUL bytes after being opened
+    return conn.read_until(b"\n", MAX_LINE).lstrip(b"\x00")
+
+
 class Device:
     """Photometric device"""
 
