@@ -54,6 +54,11 @@ tesstractor-plot = "tesstractor.plot:main"
 [tool.setuptools.packages.find]
 where = ["src"]
 
+# Without this, the data files are only included when building
+# from a git checkout (setuptools_scm), not from a tarball
+[tool.setuptools.package-data]
+tesstractor = ["*.ini", "*.tpl"]
+
 [tool.setuptools_scm]
 
 
