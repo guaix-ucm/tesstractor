@@ -158,8 +158,15 @@ the environment in `ExecStart`, for example
 
     $ sudo systemctl enable --now tesstractor.service
 
+`extras/tesstractor-plot.service` and `extras/tesstractor-plot.timer` update
+the plots of the data files in `/var/lib/tesstractor` every 15 minutes:
+
+    $ sudo systemctl enable --now tesstractor-plot.timer
+
 `extras/81-sqm.rules` is a udev rule that starts the service when an FTDI
 USB serial adapter is connected.
+
+The RPM packages install the three systemd units.
 
 ## Licensing ##
 

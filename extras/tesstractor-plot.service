@@ -1,0 +1,7 @@
+[Unit]
+Description=TESStractor plots of the data files
+Documentation=https://github.com/guaix-ucm/tesstractor
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/tesstractor-plot /var/lib/tesstractor
