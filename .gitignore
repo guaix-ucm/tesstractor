@@ -30,6 +30,9 @@ var/
 #  before PyInstaller builds the exe, so as to inject date/other infos into it.
 *.manifest
 *.spec
+# RPM specs
+!tesstractor.spec
+!extras/python-aiomqtt.spec
 
 # Installer logs
 pip-log.txt

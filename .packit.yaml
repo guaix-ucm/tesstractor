@@ -1,0 +1,16 @@
+# Packit builds RPMs in https://copr.fedorainfracloud.org/coprs/sergiopr/tesstractor/
+# for each GitHub release (tag vX.Y.Z), using tesstractor.spec.
+# python3-aiomqtt, not packaged in Fedora, is built in the same COPR
+# project from extras/python-aiomqtt.spec.
+specfile_path: tesstractor.spec
+upstream_package_name: tesstractor
+upstream_tag_template: v{version}
+
+jobs:
+  - job: copr_build
+    trigger: release
+    owner: sergiopr
+    project: tesstractor
+    targets:
+      - fedora-all-x86_64
+      - fedora-all-aarch64
