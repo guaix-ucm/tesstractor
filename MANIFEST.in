@@ -1,2 +1,3 @@
 include extras/tesstractor.service
 include extras/config.ini
+include CHANGES.md
