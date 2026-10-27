@@ -1,6 +1,6 @@
 # Changes #
 
-## 0.8.0 (unreleased) ##
+## 0.8.0 (2026-10-27) ##
 
 ### Requirements ###
 
@@ -84,5 +84,10 @@ observations (NSBM):
 - The threads were replaced by asyncio tasks.
 - The systemd unit waits for the network and restarts tesstractor on
   failure.
+- New systemd units in `extras/` to update the plots every 15 minutes
+  (`tesstractor-plot.timer`).
+- The udev rule in `extras/` only starts tesstractor for the adapters
+  of the photometers, identified by their serial number. Edit it before
+  installing it.
 - The README documents the configuration and recommends the stable serial
   port names in `/dev/serial/by-id/`.
