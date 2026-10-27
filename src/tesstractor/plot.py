@@ -24,12 +24,19 @@ from astropy.coordinates import EarthLocation
 from astropy.time import Time
 import astropy.table
 import astropy.units as u
+from astropy.utils import iers
 import astroplan
 
 # Import IDA format reader
 import tesstractor.reader  # noqa
 
 _logger = logging.getLogger(__name__)
+
+# Without network, the IERS table may be old or not cover the dates of
+# the data. The positions of the Sun and the Moon in the plots do not
+# need arcsecond precision, so do not fail in that case
+iers.conf.iers_degraded_accuracy = "warn"
+iers.conf.auto_max_age = None
 
 # Style for saving into PNG
 my_style1 = {"figure.figsize": (9, 7), "savefig.dpi": 200, "axes.labelsize": 14}
