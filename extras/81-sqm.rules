@@ -1,1 +1,8 @@
-KERNEL=="ttyUSB[0-9]*", SUBSYSTEM=="tty", SUBSYSTEMS=="usb-serial", ATTRS{idVendor}=="0403", ATTRS{idProduct}=="6001", TAG+="systemd", ENV{SYSTEMD_WANTS}="tesstractor.service"
+# Start tesstractor when the USB serial adapter of a photometer is connected.
+#
+# Many devices use the same FTDI chip (0403:6001), so the adapter is
+# identified by its serial number. Replace CHANGE_ME with the serial
+# number of your adapter, given by
+#   udevadm info -a -n /dev/ttyUSB0 | grep 'ATTRS{serial}'
+# and add one line per photometer. Then copy this file to /etc/udev/rules.d/
+SUBSYSTEM=="tty", ATTRS{idVendor}=="0403", ATTRS{idProduct}=="6001", ATTRS{serial}=="CHANGE_ME", TAG+="systemd", ENV{SYSTEMD_WANTS}+="tesstractor.service"

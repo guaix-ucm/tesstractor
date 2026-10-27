@@ -163,10 +163,13 @@ the plots of the data files in `/var/lib/tesstractor` every 15 minutes:
 
     $ sudo systemctl enable --now tesstractor-plot.timer
 
-`extras/81-sqm.rules` is a udev rule that starts the service when an FTDI
-USB serial adapter is connected.
+`extras/81-sqm.rules` is a udev rule that starts the service when the USB
+serial adapter of a photometer is connected. Many devices use the same FTDI
+chip, so edit it with the serial number of your adapter before copying it to
+`/etc/udev/rules.d/`.
 
-The RPM packages install the three systemd units.
+The RPM packages install the three systemd units; the udev rule is in the
+documentation directory.
 
 ## Licensing ##
 

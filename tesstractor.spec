@@ -62,6 +62,8 @@ install -dm 0755 %{buildroot}%{_sharedstatedir}/tesstractor
 
 %files -f %{pyproject_files}
 %doc README.md
+# The udev rule has to be edited with the serial number of the adapter
+%doc extras/81-sqm.rules
 %{_bindir}/tesstractor
 %{_bindir}/tesstractor-plot
 %{_unitdir}/tesstractor.service

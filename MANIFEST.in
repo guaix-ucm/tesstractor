@@ -1,5 +1,6 @@
 include extras/tesstractor.service
 include extras/tesstractor-plot.service
 include extras/tesstractor-plot.timer
+include extras/81-sqm.rules
 include extras/config.ini
 include CHANGES.md
