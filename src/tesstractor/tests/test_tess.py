@@ -106,6 +106,20 @@ def test_tessv2_read_data_none():
     assert dev.read_data(tries=3) is None
 
 
+def test_tessv2_dark():
+    # Captured in darkness, the photometer sends "Waiting" while it counts pulses
+    line = (
+        b'{"udp":1196, "rev":2, "name":"stars111", "freq":0.40, "mag":21.13, "tamb":0.00, "tsky":0.00,'
+        b' "wdBm":0, "hash":"988", "ain":369, "ZP":20.13}\r\n'
+    )
+    dev = TessV2(StreamSerial([b" Waiting 1\r\n", b"\r\n", line]))
+    dev.calibration = 20.13
+    res = dev.read_data(tries=3)
+    assert res["valid"]
+    assert res["freq_sensor"] == 0.40
+    assert res["magnitude"] == 21.13
+
+
 def test_tessv2_temperatures():
     dev = TessV2(StreamSerial([LINE_V2_TEMPS]))
     dev.calibration = 20.34
