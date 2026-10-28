@@ -160,7 +160,8 @@ async def start_connection(device: Device):
         # Serial I/O is blocking
         await asyncio.to_thread(device.start_connection)
     except Exception as ex:
-        ex.add_note(f"photometer {device.name}")
+        # The name of some photometers is not known before connecting
+        ex.add_note(f"photometer {device.name or device.model}")
         raise
 
 

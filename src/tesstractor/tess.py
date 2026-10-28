@@ -13,6 +13,7 @@ import re
 import math
 import datetime
 import json
+import time
 import typing
 
 from .device import Device, LineReader, PhotometerConf
@@ -326,12 +327,18 @@ class TessV2(Tess):
         self.conf_name = name
         self.conf_zero_point = zero_point
 
-    def start_connection(self, tries=30):
-        """Start photometer connection, read the name and zero point"""
+    def start_connection(self, wait=60.0):
+        """Start photometer connection, read the name and zero point.
+
+        After powering on, the photometer sends many lines of text
+        during ~8 s before the first measurement, so the limit is a
+        time, wait in seconds, not a number of lines.
+        """
         _logger.debug("start connection")
         self.lines.reset()
 
-        for _ in range(tries):
+        deadline = time.monotonic() + wait
+        while time.monotonic() < deadline:
             res = self.parse_line(self.read_msg())
             if (
                 res is not None
@@ -340,7 +347,8 @@ class TessV2(Tess):
             ):
                 break
         else:
-            msg = f"no valid data after {tries} tries, check the port and the baud rate"
+            port = getattr(self.serial, "port", "")
+            msg = f"no valid data from {port} after {wait} s, check the port and the baud rate"
             _logger.error(msg)
             raise ValueError(msg)
 

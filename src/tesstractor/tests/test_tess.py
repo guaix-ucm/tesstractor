@@ -70,10 +70,25 @@ def test_tessv2_start_connection():
     assert dev.static_conf().zero_point == 20.13
 
 
+def test_tessv2_start_connection_boot():
+    # After powering on, ~60 lines of text in ~8 s, then frames without measurement
+    boot = [b"  \r\n", b"Version: 4.31\r\n", b"Name: stars111\r\n", b"CI1: 20.13\r\n", b"RTC NOT found\r\n"]
+    boot += [b"%d: network (-80)\r\n" % n for n in range(50)]
+    boot += [b" WDT ON .............\r\n", b"0\r\n", b" Waiting 1\r\n"]
+    first = LINE_V2.replace(b'"freq":75.14, "mag":15.44', b'"freq":0.00, "mag":25.00')
+    dev = TessV2(StreamSerial(boot + [first, b"\r\n", b" Waiting 2\r\n", first, b"\r\n", LINE_V2]))
+    dev.start_connection()
+    assert dev.name == "stars111"
+    assert dev.calibration == 20.13
+    # The frames before the first measurement are not valid
+    assert not dev.read_data(tries=3)["valid"]
+    assert dev.read_data(tries=3)["valid"]
+
+
 def test_tessv2_start_connection_no_data():
     dev = TessV2(StreamSerial([b"45\r\n", b"\r\n", b"WIFI connecting\r\n"]))
     with pytest.raises(ValueError, match="no valid data"):
-        dev.start_connection(tries=5)
+        dev.start_connection(wait=0.1)
 
 
 def test_tessv2_start_connection_conf_differs(caplog):
