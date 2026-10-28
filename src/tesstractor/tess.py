@@ -38,6 +38,10 @@ MEASURE_RE = re.compile(
 # MAC used to register in MQTT if it is not in the configuration
 UNKNOWN_MAC = "01:23:45:67:89:AB"
 
+# The TESSv2 measures the period in microseconds, it saturates at 1e6 / 9 Hz
+# and sends 111111.11
+TESSV2_FREQ_MAX = 111111.0
+
 _logger = logging.getLogger(__name__)
 
 
@@ -412,7 +416,9 @@ class TessV2(Tess):
 
         payload["freq_sensor"] = freq
         payload["magnitude"] = mag
-        payload["valid"] = freq > 0
+        payload["valid"] = 0 < freq < TESSV2_FREQ_MAX
+        if freq >= TESSV2_FREQ_MAX:
+            _logger.debug("photometer saturated, freq %s", freq)
         # A photometer without temperature sensors sends 0.00 in both
         tamb, tsky = res.get("tamb"), res.get("tsky")
         if not (tamb == 0 and tsky == 0):

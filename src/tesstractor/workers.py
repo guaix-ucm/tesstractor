@@ -192,10 +192,10 @@ def avg_device_buffer(payloads):
     result["valid"] = True
 
     # we have to average tstamp, freq_sensor and magnitude
-    vals = [p for p in payloads if p["freq_sensor"] > 0]
+    vals = [p for p in payloads if p.get("valid", True) and p["freq_sensor"] > 0]
     # TODO: analyze extreme values, etc.
     if len(vals) != len(payloads):
-        msg = "some measurements have freq <= 0"
+        msg = "some measurements are not valid or have freq <= 0"
         warnings.warn(msg, RuntimeWarning)
 
     if vals:

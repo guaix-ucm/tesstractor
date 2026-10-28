@@ -1,3 +1,4 @@
+import json
 import math
 
 import pytest
@@ -123,6 +124,30 @@ def test_tessv2_zero_freq():
     dev = TessV2(StreamSerial([LINE_V2.replace(b'"freq":75.14', b'"freq":0.00')]))
     dev.calibration = 20.13
     assert not dev.read_data()["valid"]
+
+
+def test_tessv2_saturated():
+    # Captured with strong light, followed by a text line
+    sat = LINE_V2.replace(b'"freq":75.14, "mag":15.44', b'"freq":111111.11, "mag":7.52')
+    near = LINE_V2.replace(b'"freq":75.14, "mag":15.44', b'"freq":90000.0, "mag":7.74')
+    dev = TessV2(StreamSerial([sat, b"Frec Over: \r\n", near]))
+    dev.calibration = 20.13
+    assert not dev.read_data()["valid"]
+    assert dev.read_data(tries=2)["valid"]
+
+
+def test_tessv2_average_skips_saturated():
+    dev = TessV2(StreamSerial([]))
+    dev.calibration = 20.13
+    good = dev.process_msg(json.loads(LINE_V2))
+    sat = dev.process_msg(dict(json.loads(LINE_V2), freq=111111.11, mag=7.52))
+    with pytest.warns(RuntimeWarning):
+        avg = avg_device_buffer([good, sat, sat])
+    assert avg["valid"]
+    assert avg["freq_sensor"] == 75.14
+    assert avg["magnitude"] == 15.44
+    with pytest.warns(RuntimeWarning):
+        assert not avg_device_buffer([sat, sat])["valid"]
 
 
 def test_tessv2_zero_point_changes(caplog):
