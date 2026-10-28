@@ -93,18 +93,21 @@ def build_dev_from_ini(section) -> Device:
         timeout = section.getfloat("timeout", 2.0)
         conn = serial.Serial(port, baudrate, timeout=timeout)
         photo_dev = SQMLU(conn, name)
-    elif model in ["TESS-R", "TESS", "TESS-U", "TESSv2"]:
+    elif model in ["TESS-R", "TESS", "TESS-U"]:
         baudrate = section.getint("baudrate", 9600)
         timeout = section.getfloat("timeout", 1.0)
         conn = serial.Serial(port, baudrate, timeout=timeout)
         if name is None:
             logger.warning("name is none, this should be automatic")
             name = "TESS-test"
-        if model == "TESSv2":
-            photo_dev = TessV2(conn, name)
-        else:
-            photo_dev = TessR(conn, name)
+        photo_dev = TessR(conn, name)
         photo_dev.calibration = section.getfloat("zero_point", 20.0)
+    elif model == "TESSv2":
+        baudrate = section.getint("baudrate", 9600)
+        timeout = section.getfloat("timeout", 1.0)
+        conn = serial.Serial(port, baudrate, timeout=timeout)
+        # The photometer reports its name and zero point
+        photo_dev = TessV2(conn, name, section.getfloat("zero_point"))
     else:
         raise ValueError("unknown model {}".format(model))
 

@@ -14,7 +14,6 @@ import math
 import datetime
 import json
 import typing
-import warnings
 
 from .device import Device, LineReader, PhotometerConf
 
@@ -290,33 +289,59 @@ class TessR(Tess):
 class TessV2(Tess):
     """TESS serial V2
 
-    The output format of this photometer mixes text with json with this fields:
+    The photometer sends a JSON message each second, with these fields:
 
     {
-    "udp":83471,  output number , ignoring
-    "rev":2,
+    "udp":83471,  output number, ignored
+    "rev":2,  protocol revision
     "name":"stars605",
-    "freq":13.38,
+    "freq":13.38,  in Hz
     "mag":17.52,
     "tamb":30.39,
     "tsky":29.23,
-    "wdBm":-50,  wifi power, ignoring
-    "ain":448, analog input, ignoring
+    "wdBm":-50,  wifi power, ignored
+    "hash":"988",  ignored
+    "ain":448,  analog input, ignored
     "ZP":20.34  zero_point
     }
 
-
+    Between them it sends empty lines, counters (numbers)
+    and text messages, that are ignored.
     """
 
-    def __init__(self, conn, name="tess", sleep_time=1, tries=10):
+    def __init__(self, conn, name=None, zero_point=None):
         super().__init__(name=name, model="TESSv2")
         self.serial = conn
         self.lines = LineReader(conn)
+        # Values from the configuration, the photometer reports its own
+        self.conf_name = name
+        self.conf_zero_point = zero_point
 
-    def start_connection(self):
-        """Start photometer connection"""
+    def start_connection(self, tries=30):
+        """Start photometer connection, read the name and zero point"""
         _logger.debug("start connection")
         self.lines.reset()
+
+        for _ in range(tries):
+            res = self.parse_line(self.read_msg())
+            if res is not None and all(res.get(key) is not None for key in ["name", "ZP", "freq", "mag"]):
+                break
+        else:
+            msg = f"no valid data after {tries} tries, check the port and the baud rate"
+            _logger.error(msg)
+            raise ValueError(msg)
+
+        self.name = self.serial_number = res["name"]
+        self.calibration = res["ZP"]
+        _logger.info("photometer %s, zero point %s", self.name, self.calibration)
+        if self.conf_name is not None and self.conf_name != self.name:
+            _logger.warning("name in the configuration is %s, using %s from the photometer", self.conf_name, self.name)
+        if self.conf_zero_point is not None and self.conf_zero_point != self.calibration:
+            _logger.warning(
+                "zero_point in the configuration is %s, using %s from the photometer",
+                self.conf_zero_point,
+                self.calibration,
+            )
 
     def close_connection(self):
         """End photometer connection"""
@@ -333,77 +358,67 @@ class TessV2(Tess):
         pass
 
     def read_metadata(self, tries=1):
-        # We can't ask the photometer its values
+        # The metadata is read in start_connection
         pass
+
+    @staticmethod
+    def parse_line(msg: bytes) -> dict | None:
+        """Return the JSON message in the line, None if there is none"""
+        try:
+            res = json.loads(msg)
+        except ValueError:
+            return None
+        # Counters are numbers, not dicts
+        if isinstance(res, dict):
+            return res
+        return None
 
     def read_data(self, tries=1):
         """Read measurements"""
-
-        # This TESS mixes messages with actual data
-        # and sometimes expends a lot of time
-        # complaining about WIFI
-        # I'm going to ignore 'tries'
-        # And I will return None instead
-
-        # Tries should go probably to read_msg
-        # to see if the device returns actual values
-        # Here we are waiting until we get actual valid data
-        logger = logging.getLogger(__name__)
-        this_try = 0
-        while this_try < tries:
+        for _ in range(tries):
             msg = self.read_msg()
-            # logger.debug("msg is %s", msg)
-            try:
-                res = json.loads(msg)
-            except ValueError:
-                res = None
-            # Sometimes it returns numbers, not dicts
-            if res and isinstance(res, dict):
-                logger.debug("process message")
-                pmsg = self.process_msg(res)
-                logger.debug("processed data is %s", pmsg)
-                return pmsg
-            else:
-                # We expect several non-json messages between correct msgs
-                return None
+            res = self.parse_line(msg)
+            if res is None:
+                # Several non JSON lines are expected between measurements
+                _logger.debug("ignoring %s", msg)
+                continue
+            pmsg = self.process_msg(res)
+            _logger.debug("processed data is %s", pmsg)
+            return pmsg
 
+        _logger.debug("no measurement after %d lines", tries)
         return None
 
-    def process_msg(self, res: typing.Mapping) -> dict:
+    def process_msg(self, res: typing.Mapping) -> dict | None:
         """Convert the message from the photometer to unified format"""
-        # temps
-        # Convert whatever we read from the photometer
-        # to a unified format
-        payload = dict()
-        payload["model"] = "TESSv2"
-        payload["cmd"] = "r"
-        payload["protocol_revision"] = 2
-        payload["zero_point"] = self.calibration
-        payload["name"] = self.name
-
-        msg_zp = res.get("ZP")
-        if self.calibration != msg_zp:
-            msg = "Calibration values don't agree: self:{} payload:{}".format(self.calibration, msg_zp)
-            warnings.warn(msg, RuntimeWarning)
-
-        msg_rev = res.get("rev")
-        if msg_rev != 2:
-            msg = "Protocol values don't agree: self:{} payload:{}".format(2, msg_rev)
-            warnings.warn(msg, RuntimeWarning)
-
-        # Actual lectures from the photometer
         freq = res.get("freq")  # Actual measurement, in Hz
         mag = res.get("mag")
         if freq is None or mag is None:
             _logger.warning("message without freq or mag, ignoring %s", res)
             return None
+
+        payload = dict()
+        payload["model"] = "TESSv2"
+        payload["cmd"] = "r"
+        payload["protocol_revision"] = res.get("rev", 2)
+        payload["name"] = self.name
+
+        msg_zp = res.get("ZP", self.calibration)
+        if msg_zp != self.calibration:
+            _logger.warning("zero point of the photometer changed from %s to %s", self.calibration, msg_zp)
+            # The file header keeps the initial value
+            self.calibration = msg_zp
+        payload["zero_point"] = msg_zp
+
         payload["freq_sensor"] = freq
         payload["magnitude"] = mag
-        payload["valid"] = True
-        # Temperatures are optional
-        for key, msg_key in [("temp_ambient", "tamb"), ("temp_sky", "tsky")]:
-            if res.get(msg_key) is not None:
-                payload[key] = res[msg_key]
+        payload["valid"] = freq > 0
+        # A photometer without temperature sensors sends 0.00 in both
+        tamb, tsky = res.get("tamb"), res.get("tsky")
+        if not (tamb == 0 and tsky == 0):
+            for key, value in [("temp_ambient", tamb), ("temp_sky", tsky)]:
+                if value is not None:
+                    payload[key] = value
 
         # Add time information
         payload["tstamp"] = datetime.datetime.now(datetime.UTC)

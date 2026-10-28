@@ -7,6 +7,8 @@ import signal
 import pytest
 
 from ..cli import main, build_location_from_ini, run_service, build_dev_from_ini, readerconf_from_ini, error_summary
+from ..tess import TessV2
+from .fakes import StreamSerial
 
 
 def test_config(capsys):
@@ -32,6 +34,17 @@ def test_unknown_model():
     cparser.read_dict({"photometer": {"model": "XXX"}})
     with pytest.raises(ValueError):
         build_dev_from_ini(cparser["photometer"])
+
+
+def test_build_tessv2(monkeypatch):
+    monkeypatch.setattr("tesstractor.cli.serial.Serial", lambda *args, **kwargs: StreamSerial([]))
+    cparser = configparser.ConfigParser()
+    cparser.read_dict({"photometer": {"model": "TESSv2", "port": "/dev/null"}})
+    dev = build_dev_from_ini(cparser["photometer"])
+    assert isinstance(dev, TessV2)
+    # Read from the photometer in start_connection
+    assert dev.conf_name is None
+    assert dev.conf_zero_point is None
 
 
 async def run_with_file(tmp_path, interval, fail_after=None):

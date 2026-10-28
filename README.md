@@ -66,13 +66,13 @@ has `enabled: False`.
 | Option | Default | Description |
 |---|---|---|
 | `model` | `SQM-TEST` | `SQM-LU`, `TESS-R` (also `TESS`, `TESS-U`), `TESSv2`, or `SQM-TEST` (simulated) |
-| `name` | | Name of the photometer, used in file names and MQTT |
+| `name` | | Name of the photometer, used in file names and MQTT (`TESSv2` reports its own) |
 | `port` | `/dev/ttyUSB0` | Serial port, see [Serial ports](#serial-ports) |
 | `baudrate` | 115200 (SQM), 9600 (TESS) | |
 | `timeout` | 2.0 (SQM), 1.0 (TESS) | Seconds to wait for a line from the photometer |
 | `tsample` | 1.0 | Seconds between readings |
 | `nsamples` | 0 | Readings averaged before sending them to the outputs; 0 or 1, no averaging |
-| `zero_point` | 20.0 | Zero point of TESS photometers (the SQM reports its own) |
+| `zero_point` | 20.0 | Zero point of TESS photometers (the SQM and `TESSv2` report their own) |
 | `mac` | | MAC address of the TESS, for the file header and the MQTT registration |
 | `filter`, `fov`, `azimuth`, `altitude`, `cover_offset` | | Description of the instrument for the file header |
 

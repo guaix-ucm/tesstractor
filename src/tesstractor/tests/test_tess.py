@@ -49,13 +49,67 @@ def test_tessr_read_data_none():
     assert dev.read_data(tries=3) is None
 
 
-def test_tessv2():
-    msg = b'{"udp":83471,"rev":2,"name":"stars605","freq":13.38,"mag":17.52,"tamb":30.39,"tsky":29.23,"ZP":20.34}\r\n'
-    dev = TessV2(StreamSerial([b"WIFI connecting\r\n", msg]), "stars605")
+# Line of a TESSv2 without temperature sensors
+LINE_V2 = (
+    b'{"udp":40, "rev":2, "name":"stars111", "freq":75.14, "mag":15.44, "tamb":0.00, "tsky":0.00,'
+    b' "wdBm":0, "hash":"988", "ain":364, "ZP":20.13}\r\n'
+)
+LINE_V2_TEMPS = (
+    b'{"udp":83471,"rev":2,"name":"stars605","freq":13.38,"mag":17.52,"tamb":30.39,"tsky":29.23,"ZP":20.34}\r\n'
+)
+
+
+def test_tessv2_start_connection():
+    conn = StreamSerial([b"\xfcets Jul 29 2019 12:21:46\r\n", b"45\r\n", b"\r\n", LINE_V2])
+    dev = TessV2(conn)
+    dev.start_connection()
+    assert dev.name == "stars111"
+    assert dev.serial_number == "stars111"
+    assert dev.calibration == 20.13
+    assert dev.static_conf().zero_point == 20.13
+
+
+def test_tessv2_start_connection_no_data():
+    dev = TessV2(StreamSerial([b"45\r\n", b"\r\n", b"WIFI connecting\r\n"]))
+    with pytest.raises(ValueError, match="no valid data"):
+        dev.start_connection(tries=5)
+
+
+def test_tessv2_start_connection_conf_differs(caplog):
+    dev = TessV2(StreamSerial([LINE_V2]), "other", 20.0)
+    dev.start_connection()
+    assert dev.name == "stars111"
+    assert dev.calibration == 20.13
+    assert "name in the configuration is other" in caplog.text
+    assert "zero_point in the configuration is 20.0" in caplog.text
+
+
+def test_tessv2_read_data():
+    dev = TessV2(StreamSerial([LINE_V2, b"\r\n", b"50\r\n", LINE_V2]))
+    dev.start_connection()
+    res = dev.read_data(tries=3)
+    assert res["valid"]
+    assert res["name"] == "stars111"
+    assert res["freq_sensor"] == 75.14
+    assert res["magnitude"] == 15.44
+    assert res["zero_point"] == 20.13
+    assert res["protocol_revision"] == 2
+    assert res["tstamp"].tzinfo is not None
+    # 0.00 in both temperatures, there are no sensors
+    assert "temp_ambient" not in res
+    assert "temp_sky" not in res
+
+
+def test_tessv2_read_data_none():
+    dev = TessV2(StreamSerial([b"\r\n", b"50\r\n", b"\r\n"]))
+    assert dev.read_data(tries=3) is None
+
+
+def test_tessv2_temperatures():
+    dev = TessV2(StreamSerial([LINE_V2_TEMPS]))
     dev.calibration = 20.34
-    assert dev.read_data() is None
     res = dev.read_data()
-    assert res["freq_sensor"] == 13.38
+    assert res["temp_ambient"] == 30.39
     assert res["temp_sky"] == 29.23
 
 
@@ -63,6 +117,21 @@ def test_tessv2_missing_values():
     dev = TessV2(StreamSerial([b'{"rev":2,"freq":13.38,"ZP":20.0}\r\n']), "stars605")
     dev.calibration = 20.0
     assert dev.read_data() is None
+
+
+def test_tessv2_zero_freq():
+    dev = TessV2(StreamSerial([LINE_V2.replace(b'"freq":75.14', b'"freq":0.00')]))
+    dev.calibration = 20.13
+    assert not dev.read_data()["valid"]
+
+
+def test_tessv2_zero_point_changes(caplog):
+    dev = TessV2(StreamSerial([LINE_V2, LINE_V2.replace(b"20.13", b"20.20"), LINE_V2.replace(b"20.13", b"20.20")]))
+    dev.start_connection()
+    assert dev.read_data()["zero_point"] == 20.20
+    assert dev.read_data()["zero_point"] == 20.20
+    # Only one warning
+    assert caplog.text.count("zero point of the photometer changed") == 1
 
 
 def test_tessr_line_in_pieces():
