@@ -120,6 +120,38 @@ def test_tessv2_missing_values():
     assert dev.read_data() is None
 
 
+@pytest.mark.parametrize(
+    "line",
+    [
+        # A frame cut and joined with the end of another one
+        b'{"udp":40, "rev":2, "name":"stars111", "freq":75.14, "mag":"988", "ain":364, "ZP":20.13}\r\n',
+        b'{"udp":40, "rev":2, "name":"stars111", "freq":true, "mag":15.44, "ZP":20.13}\r\n',
+        b'{"udp":40, "rev":2, "name":"stars111", "freq":NaN, "mag":15.44, "ZP":20.13}\r\n',
+    ],
+)
+def test_tessv2_wrong_types(line):
+    dev = TessV2(StreamSerial([line]))
+    dev.calibration = 20.13
+    assert dev.read_data() is None
+
+
+def test_tessv2_wrong_types_optional():
+    line = b'{"udp":40, "rev":2, "name":"stars111", "freq":75.14, "mag":15.44, "tamb":"988", "tsky":2.0, "ZP":"x"}\r\n'
+    dev = TessV2(StreamSerial([line]))
+    dev.calibration = 20.13
+    res = dev.read_data()
+    assert res["zero_point"] == 20.13
+    assert "temp_ambient" not in res
+    assert res["temp_sky"] == 2.0
+
+
+def test_tessv2_start_connection_wrong_types():
+    bad = LINE_V2.replace(b'"ZP":20.13', b'"ZP":"988"')
+    dev = TessV2(StreamSerial([bad, LINE_V2]))
+    dev.start_connection()
+    assert dev.calibration == 20.13
+
+
 def test_tessv2_zero_freq():
     dev = TessV2(StreamSerial([LINE_V2.replace(b'"freq":75.14', b'"freq":0.00')]))
     dev.calibration = 20.13

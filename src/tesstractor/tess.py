@@ -45,6 +45,11 @@ TESSV2_FREQ_MAX = 111111.0
 _logger = logging.getLogger(__name__)
 
 
+def _is_number(value) -> bool:
+    """Check that a value from a JSON message is a finite number"""
+    return isinstance(value, (int, float)) and not isinstance(value, bool) and math.isfinite(value)
+
+
 class TESSConf(PhotometerConf):
     pass
 
@@ -328,7 +333,11 @@ class TessV2(Tess):
 
         for _ in range(tries):
             res = self.parse_line(self.read_msg())
-            if res is not None and all(res.get(key) is not None for key in ["name", "ZP", "freq", "mag"]):
+            if (
+                res is not None
+                and isinstance(res.get("name"), str)
+                and all(_is_number(res.get(key)) for key in ["ZP", "freq", "mag"])
+            ):
                 break
         else:
             msg = f"no valid data after {tries} tries, check the port and the baud rate"
@@ -397,8 +406,9 @@ class TessV2(Tess):
         """Convert the message from the photometer to unified format"""
         freq = res.get("freq")  # Actual measurement, in Hz
         mag = res.get("mag")
-        if freq is None or mag is None:
-            _logger.warning("message without freq or mag, ignoring %s", res)
+        # Lines cut or joined can be valid JSON with wrong values
+        if not (_is_number(freq) and _is_number(mag)):
+            _logger.warning("message without valid freq or mag, ignoring %s", res)
             return None
 
         payload = dict()
@@ -407,7 +417,9 @@ class TessV2(Tess):
         payload["protocol_revision"] = res.get("rev", 2)
         payload["name"] = self.name
 
-        msg_zp = res.get("ZP", self.calibration)
+        msg_zp = res.get("ZP")
+        if not _is_number(msg_zp):
+            msg_zp = self.calibration
         if msg_zp != self.calibration:
             _logger.warning("zero point of the photometer changed from %s to %s", self.calibration, msg_zp)
             # The file header keeps the initial value
@@ -423,7 +435,7 @@ class TessV2(Tess):
         tamb, tsky = res.get("tamb"), res.get("tsky")
         if not (tamb == 0 and tsky == 0):
             for key, value in [("temp_ambient", tamb), ("temp_sky", tsky)]:
-                if value is not None:
+                if _is_number(value):
                     payload[key] = value
 
         # Add time information
