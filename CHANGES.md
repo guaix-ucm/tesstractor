@@ -1,5 +1,25 @@
 # Changes #
 
+## 0.8.1 (2026-10-29) ##
+
+### Fixed ###
+
+- TESSv2: tested with a real photometer. tesstractor reads the first message
+  on startup and takes the name and the zero point from the photometer; the
+  `name` and `zero_point` of the configuration are no longer used for this
+  model, a warning is logged if they differ. If no message arrives in 60 s
+  (wrong port or baud rate, or the photometer did not boot), tesstractor
+  exits with an error.
+- TESSv2: the lines that are not measurements (blank lines, counters,
+  `Waiting` messages, boot messages) and messages with values that are not
+  numbers are skipped. Before, they could stop tesstractor.
+- TESSv2: saturated measurements (111111.11 Hz with strong light) and
+  measurements with frequency 0 are not used.
+- TESSv2: the temperatures are left empty when the photometer has no
+  temperature sensors (it sends 0.00 for both).
+- Measurements marked as not valid by the photometer, for example an
+  overflow of a TESS-R, were included in the median of each interval.
+
 ## 0.8.0 (2026-10-27) ##
 
 ### Requirements ###

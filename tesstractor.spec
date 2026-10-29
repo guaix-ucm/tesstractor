@@ -1,7 +1,7 @@
 # Built in https://copr.fedorainfracloud.org/coprs/sergiopr/tesstractor/
 # by Packit for each GitHub release (.packit.yaml), Version is set from the tag
 Name:           tesstractor
-Version:        0.8.0
+Version:        0.8.1
 Release:        1%{?dist}
 Summary:        Read data from TESS and SQM-LU sky brightness photometers
 
@@ -75,6 +75,9 @@ install -dm 0755 %{buildroot}%{_sharedstatedir}/tesstractor
 
 
 %changelog
+* Thu Oct 29 2026 Sergio Pascual <sergiopr@fis.ucm.es> - 0.8.1-1
+- Update to 0.8.1
+
 * Tue Oct 27 2026 Sergio Pascual <sergiopr@fis.ucm.es> - 0.8.0-1
 - Update to 0.8.0, built with pyproject macros
 - Install the systemd units and the sample configuration
